@@ -49,12 +49,13 @@ Speed.prototype.initiate = function () {
  * @param {function} callBack the callback function when all the file have successfully been added to the dom 
  */
 Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase) {
-    scriptbase = (typeof scriptbase == "undefined" || scriptbase == null) ? "/_layouts/15/" : ("/_layouts/15/" + scriptbase);
+    scriptbase = (typeof scriptbase == "undefined" || scriptbase == null) ? "/_layouts/15/" : (scriptbase + "/_layouts/15/");
     var duplicateExists = this.checkScriptDuplicates("sp.js");
     if (typeof properties !== "undefined" && properties !== null &&
             !this.checkScriptDuplicates("SP.UserProfiles.js") && !this.checkScriptDuplicates("clientpeoplepicker.js")) {
-        if (typeof properties.userProfile !== "undefined" && properties.userProfile)
+        /*if (typeof properties.userProfile !== "undefined" && properties.userProfile) {
             $.getScript(scriptbase + "SP.UserProfiles.js");
+        }*/
 
         if (!this.checkScriptDuplicates("SP.RequestExecutor.js") && typeof properties.requestExecutor !== "undefined" &&
             properties.requestExecutor) {
@@ -63,12 +64,10 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
 
         if (typeof properties.clientPeoplePicker !== "undefined" && properties.clientPeoplePicker) {
             //load all client peoplepicker js dependencies 
-            $.getScript(scriptbase + "clienttemplates.js",
-                $.getScript(scriptbase + "clientforms.js",
-                    $.getScript(scriptbase + "autofill.js",
-                            $.getScript(scriptbase + "clientpeoplepicker.js", function () {
-                                setTimeout(workflowScripts, 1000);
-                            })
+            $.getScript(scriptbase + "clienttemplates.js", $.getScript(scriptbase + "clientforms.js", $.getScript(scriptbase + "autofill.js", $.getScript(scriptbase + "clientpeoplepicker.js", function ()
+            {
+                 setTimeout(workflowScripts, 1000);
+            })
                     )
                 )
             );
@@ -82,7 +81,15 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
     }
 
     function workflowScripts() {
-        SP.SOD.executeFunc("sp.js", 'SP.ClientContext', callBack);
+        if (properties.userProfile) {
+            SP.SOD.executeFunc("sp.js", 'SP.ClientContext', function () {
+                $.getScript(scriptbase + "SP.UserProfiles.js");
+                SP.SOD.executeOrDelayUntilScriptLoaded(callBack, 'SP.UserProfiles.js');
+            });
+            
+        }
+        else
+            SP.SOD.executeFunc("sp.js", 'SP.ClientContext', callBack);
     }
 }
 
