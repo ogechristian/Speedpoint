@@ -333,7 +333,7 @@ Speed.prototype.validateField = function (elementObj) {
         $("#" + elementObj.id).siblings(".temp-speedmsg").remove();
         $("#" + elementObj.id).removeClass("speedhtmlerr");
     }
-    if (elementObj.styleElement && !this.stylePlace) this.styleErrors();
+    if (elementObj.styleElement && !this.stylePlace) this.styleValidatedClass();
 };
 
 /**
