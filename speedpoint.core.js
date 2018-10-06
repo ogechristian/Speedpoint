@@ -901,6 +901,7 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
+ * @param {function} conditions this parameter includes special conditions for each object properties, condition must return an object 
  * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
  * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
@@ -908,7 +909,7 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
  * from there
  */
-Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls, onSuccess, onFailed, appContext) {
+Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls,conditions, onSuccess, onFailed, appContext) {
     var controlArray = this.getControls();
     var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -947,7 +948,15 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
                     objectToReturn[controlsToUse[i]] = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]));
                 }
             }
-            listItems.push(objectToReturn);
+
+            if (typeof conditions !== null && typeof conditions === "function") {
+                objectToReturn = conditions(objectToReturn);
+            }
+
+            //includes non empty objects
+            if (!$.isEmptyObject(objectToReturn)) {
+                listItems.push(objectToReturn);
+            }
         }
         onSuccess(listItems);
     },onFailedCall,appContext);
@@ -1073,6 +1082,7 @@ Speed.prototype.DataForTable = {
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
+ *  * @param {function} conditions this parameter includes special conditions for each object properties, condition must return an object
  * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
  * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
@@ -1080,9 +1090,9 @@ Speed.prototype.DataForTable = {
  * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
  * from there
  */
-Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls,onSuccess, onFailed, appContext){
+Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
     SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
-    this.getListToItems(SpeedContext, listName, caml, controls, function(requestItems){
+    this.getListToItems(SpeedContext, listName, caml, controls,conditions, function(requestItems){
         var tableControls = SpeedContext.getControls();
         SpeedContext.DataForTable.tabledata = requestItems;
         var Arr = SpeedContext.DataForTable.tabledata;
