@@ -428,6 +428,48 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             this.validateField({ id: inputid, msg: validationMessage, extension: validationtype });
         }
     }
+
+    //Speed bind and table to array
+    var elementValidate = document.querySelectorAll("[speed-bind-table]");
+    for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
+        var property = elementValidate[i].getAttribute("speed-bind-table");
+        var strignify = elementValidate[i].getAttribute("speed-bind-JSON");
+        var inputid = elementValidate[i].getAttribute("id");
+        var objproperties = [];
+        $("#" + inputid + " > thead > tr > th").each(function () {
+            if (this.getAttribute("speed-array-prop") !== null)
+                objproperties.push(this.getAttribute("speed-array-prop"));
+        });
+
+        var arrayValue = [];
+        $("#" + inputid + " > tbody > tr").each(function () {
+            var rowId = this.id;
+            var objCount = 0;
+            var objValue = {};
+            $("#" + rowId + " td").each(function (a) {
+                var inputTag = $(this).children()[0];
+                var hasInclude = $(inputTag).hasClass("speed-table-include");
+                if (hasInclude) {
+                    if (inputTag.tagName.toLowerCase() == "input" || inputTag.tagName.toLowerCase() == "select" || inputTag.tagName.toLowerCase() == "textarea") {
+                        if (inputTag.type == "checkbox")
+                            objValue[objproperties[objCount]] = inputTag.checked;
+                        else
+                            objValue[objproperties[objCount]] = inputTag.value;
+                    }
+                    else
+                        objValue[objproperties[objCount]] = inputTag.innerText;
+
+                    objCount++;
+                }
+            });
+            arrayValue.push(objValue);
+        });
+        if (strignify == "YES")
+            returnObject[property] = JSON.stringify(arrayValue);
+        else
+        returnObject[property] = arrayValue;
+    }
+
     return returnObject;
 }
 
@@ -508,6 +550,29 @@ Speed.prototype.htmlBind = function (listObjects) {
                                 element[i].innerHTML = listObjects[key];
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tableProperties) {
+    for (var key in listObjects) {
+        if (listObjects.hasOwnProperty(key)) {
+            var element = document.querySelectorAll("[speed-bind-table='" + key + "']");
+            for (var i = 0; i <= (element.length - 1) ; i++) {
+                var inputid = element[i].getAttribute("id");
+                var columnValue = [];
+                if (parse) {
+                    columnValue = JSON.parse(speedContext.formatStringJSON(listObjects[key]));
+                }
+                else {
+                    columnValue = listObjects[key];
+                }
+
+                for (var x = 0; x <= (columnValue.length - 1) ; x++) {
+                    var str = tableProperties(columnValue[x]);
+                    $("#" + inputid + " > tbody").append(str);
                 }
             }
         }
