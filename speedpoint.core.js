@@ -984,8 +984,8 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
  * from there
  */
-Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls,conditions, onSuccess, onFailed, appContext) {
-    var controlArray = this.getControls();
+Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls,tableonly,conditions, onSuccess, onFailed, appContext) {
+    var controlArray = this.getControls(tableonly);
     var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
     
@@ -1036,6 +1036,8 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
         onSuccess(listItems);
     },onFailedCall,appContext);
 }
+
+
 
 /**
  * Namespace for the Data table function
@@ -1167,8 +1169,9 @@ Speed.prototype.DataForTable = {
  */
 Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
     SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
-    this.getListToItems(SpeedContext, listName, caml, controls,conditions, function(requestItems){
-        var tableControls = SpeedContext.getControls();
+    this.getListToItems(SpeedContext, listName, caml, controls,true, conditions, function (requestItems) {
+        //gets only table controls
+        var tableControls = SpeedContext.getControls(true);
         SpeedContext.DataForTable.tabledata = requestItems;
         var Arr = SpeedContext.DataForTable.tabledata;
         if (Arr.length != 0) {
