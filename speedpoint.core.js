@@ -942,7 +942,9 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
                     try {
                         objProp.email = SpeedContext.checkNull(items.get_item(controlArray[i]).get_email());
                     }
-                    catch (e) { };
+                    catch (e) {
+                        objProp.email = "";
+                     };
                 }
                 objectToReturn[controlArray[i]] = objProp;
             }
@@ -956,7 +958,9 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
                     try {
                         objectOfUsers.email = multiUser[j].get_email();
                     }
-                    catch (e) { };
+                    catch (e) {
+                        objectOfUsers.email = "";
+                     };
                     arrayToSave.push(objectOfUsers);
                 }
                 objectToReturn[controlArray[i]] = arrayToSave;
