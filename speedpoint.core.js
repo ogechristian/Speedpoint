@@ -938,6 +938,12 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
                 var objProp = {};
                 objProp.id = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupId());
                 objProp.value = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupValue());
+                if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
+                    try {
+                        objProp.email = SpeedContext.checkNull(items.get_item(controlArray[i]).get_email());
+                    }
+                    catch (e) { };
+                }
                 objectToReturn[controlArray[i]] = objProp;
             }
             else if (SPFieldType.toLowerCase() === "array") {
@@ -947,6 +953,10 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
                     var objectOfUsers = {};
                     objectOfUsers.id = multiUser[j].get_lookupId();
                     objectOfUsers.value = multiUser[j].get_lookupValue();
+                    try {
+                        objectOfUsers.email = multiUser[j].get_email();
+                    }
+                    catch (e) { };
                     arrayToSave.push(objectOfUsers);
                 }
                 objectToReturn[controlArray[i]] = arrayToSave;
