@@ -477,30 +477,36 @@ Speed.prototype.bind = function (listObjects, staticBind) {
  * The getControls function gets all speed-bind & speed-bind-validate html attributes names
   * @returns {Array} the Array return contains all controls names
  */
-Speed.prototype.getControls = function () {
+Speed.prototype.getControls = function (onlyTables) {
+    var pickOnlyTable = (typeof onlyTable === "undefined") ? false : onlyTables
     var returnArr = [];
-    //decides if u want to bind static fields to objects
-    //set this option to false if the static fields already contains the same values with the object
-    var element = document.querySelectorAll("[speed-bind]");
-    for (var i = 0; i <= (element.length - 1) ; i++) {
-        var property = element[i].getAttribute("speed-bind");
-        if ($.inArray(property, returnArr) < 0)
-            returnArr.push(property);
+
+    if (!onlyTables) {
+        //decides if u want to bind static fields to objects
+        //set this option to false if the static fields already contains the same values with the object
+        var element = document.querySelectorAll("[speed-bind]");
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var property = element[i].getAttribute("speed-bind");
+            if ($.inArray(property, returnArr) < 0)
+                returnArr.push(property);
+        }
+
+        //Speed bind and validate html
+        var elementValidate = document.querySelectorAll("[speed-bind-validate]");
+        for (var i = 0; i <= (elementValidate.length - 1); i++) {
+            var property = elementValidate[i].getAttribute("speed-bind-validate");
+            if ($.inArray(property, returnArr) < 0)
+                returnArr.push(property);
+        }
     }
 
-    //Speed bind and validate html
-    var elementValidate = document.querySelectorAll("[speed-bind-validate]");
-    for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
-        var property = elementValidate[i].getAttribute("speed-bind-validate");
-        if ($.inArray(property, returnArr) < 0)
-            returnArr.push(property);
-    }
-
-    var element = document.querySelectorAll("[speed-table-data]");
-    for (var i = 0; i <= (element.length - 1) ; i++) {
-        var property = element[i].getAttribute("speed-table-data");
-        if ($.inArray(property, returnArr) < 0)
-            returnArr.push(property);
+    if(onlyTables){
+        var element = document.querySelectorAll("[speed-table-data]");
+        for (var i = 0; i <= (element.length - 1) ; i++) {
+            var property = element[i].getAttribute("speed-table-data");
+            if ($.inArray(property, returnArr) < 0)
+                returnArr.push(property);
+        }
     }
     return returnArr;
 }
