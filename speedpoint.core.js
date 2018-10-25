@@ -7,8 +7,22 @@ var Speed = Speed || {};
  * This is the SpeedPoint Function declaration.
  * This initiates a speedpoint object and ensures the context of the object is set based on the parameters passed for the speed object.
  * This is used internally by the speedpoint object to intiate sharepoint async request based on the context
- * @param {String} [cxt="CurrentContext URL"] the target site url
- * @param {bool} [bolval=false] this set debug mode 
+ * @param {String} [cxt="Current Context URL"] the ctx param can contain the url of the site you want to target, if this parameter is ommited
+ * then the current page site url is used by default.
+ * @param {bool} [bolval=false] setting this to true while passing a url in the first parameter indicates that an APPcontext is created, if no 
+ * boolean value is passed the default value is false, which means a normal site context is created
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * @example
+ * // returns a normal context related to the site passed in the ctx parameter
+ * // absoulte urls can be used also
+ * var speedCtx = new Speed("http://captsource.com");
+ * @example
+ * // returns an app context related to the site passed in the ctx parameter (the host URL).This is used to create a context used for cross domain 
+ * // request from an App to the SharePoint on Premise site. Here the host url is passed (the URl where your List for cross domain request resides)
+ * var speedAppCtx = new Speed("http://captsource.com",true);
  */
 function Speed(cxt, bolval) {
     this.errors = [];
