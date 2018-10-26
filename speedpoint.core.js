@@ -1094,7 +1094,7 @@ Speed.prototype.getParameterByName = function (name, url) {
 }
 
 /**
- * The loadDependency function dynamically adds the dependency scripts required to make sharepoint JSOM calls
+ * This method checks if a sript already exist in the page, if the script exist true is return else false is returned
  * @param {string} scriptToCheck any part of the script source you want to validate against
  * @return {bool} if the script exist true is returned 
  */
@@ -1299,9 +1299,16 @@ Speed.prototype.checkNull = function (val) {
 };
 
 /**
- * The removeHtml function removes html for a string of elements
+ * The removeHtml function removes html for a string of elements.
+ * this method is used for presenting only text values from rich text box columns in sharepoint lists
  * @param {String} val parameter supplies a string
  * @returns {String} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the string "take me with speed..like the flash"
+ * var checkvalue = "<div>take me with speed..</div><div>like the flash</div>
+ * var returnedValue = speedctx.removeHtml(checkvalue);
  */
 Speed.prototype.removeHtml = function (val) {
     var tmp = document.createElement("DIV");
@@ -1469,6 +1476,22 @@ String.prototype.SPDomainFromFullLogin = function () {
     var returnSplit = "";
     try {
         returnSplit = this.toString().split("\\")[0];
+    }
+    catch (e) {
+        returnSplit = this.toString();
+    }
+    return returnSplit;
+}
+
+/**
+ * GLOBAL METHOD
+ * String Object Extension to return a domain and login name which excludes the authentication type
+ * @returns String Domain and login name of the organization, excludes the authentication type
+ */
+String.prototype.SPDomainLoginFromFullLogin = function () {
+    var returnSplit = "";
+    try {
+        returnSplit = this.toString().split("|")[0];
     }
     catch (e) {
         returnSplit = this.toString();
