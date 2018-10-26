@@ -57,19 +57,35 @@ Speed.prototype.initiate = function () {
 };
 
 /**
- * The loadDependency function dynamically adds the dependency scripts required to make sharepoint JSOM calls
- * @param {string} scriptbase the url of the site the script will be called from
- * @param {object} properties an object that specifies additional scripts to add
- * @param {function} callBack the callback function when all the file have successfully been added to the dom 
+ * The loadDependency function dynamically adds the dependency scripts required to make sharepoint JSOM calls. This is similar to jquerys document .ready 
+ * but in this case sharepoint dependencies are loaded
+ * @param {callBack} callBack  the callback function when all the file have successfully been added to the DOM
+ * @param {object} properties an object that specifies the type of additional scripts to be included to the DOM
+ * @param {string} [scriptbase = "root site url"] the url of the site the script will be called from. by default the root site url is used
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //this code loads only SP.js and its dependencies ..so no need to reference this at the page level
+ * //note that the properties parameter is null in this case
+ * speedCtx.loadSPDependencies(function(){
+ *     console.log("finished Loading files");
+ * },null);
+ * 
+ *  @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //this code loads only SP.js,SP.RequestExecutor.js,SP.UserProfiles.js,clientpeoplepicker.js and its dependencies .. so no need to reference this at the page level
+ * //note that the properties parameter is contains an object with the keys of the scripts we want set to true in this case
+ * speedCtx.loadSPDependencies(function(){
+ *     console.log("finished Loading files");
+ * },{requestExecutor: true, clientPeoplePicker: true, userProfile: true});
  */
 Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase) {
     scriptbase = (typeof scriptbase == "undefined" || scriptbase == null) ? "/_layouts/15/" : (scriptbase + "/_layouts/15/");
     var duplicateExists = this.checkScriptDuplicates("sp.js");
     if (typeof properties !== "undefined" && properties !== null &&
             !this.checkScriptDuplicates("SP.UserProfiles.js") && !this.checkScriptDuplicates("clientpeoplepicker.js")) {
-        /*if (typeof properties.userProfile !== "undefined" && properties.userProfile) {
-            $.getScript(scriptbase + "SP.UserProfiles.js");
-        }*/
 
         if (!this.checkScriptDuplicates("SP.RequestExecutor.js") && typeof properties.requestExecutor !== "undefined" &&
             properties.requestExecutor) {
@@ -78,10 +94,10 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
 
         if (typeof properties.clientPeoplePicker !== "undefined" && properties.clientPeoplePicker) {
             //load all client peoplepicker js dependencies 
-            $.getScript(scriptbase + "clienttemplates.js", $.getScript(scriptbase + "clientforms.js", $.getScript(scriptbase + "autofill.js", $.getScript(scriptbase + "clientpeoplepicker.js", function ()
-            {
-                 setTimeout(workflowScripts, 1000);
-            })
+            $.getScript(scriptbase + "clienttemplates.js", 
+                $.getScript(scriptbase + "clientforms.js", 
+                    $.getScript(scriptbase + "autofill.js", 
+                        $.getScript(scriptbase + "clientpeoplepicker.js", function (){setTimeout(workflowScripts, 1000);})
                     )
                 )
             );
@@ -210,9 +226,7 @@ Speed.prototype.CheckNoofUsedFields = function (Arr, val) {
 };
 
 /* ============================== Validation Section ============================*/
-/**
- * Extendable validation logic properties. This is where custom validation logic can be introduced to speedpoint
- */
+//Extendable validation logic properties. This is where custom validation logic can be introduced to speedpoint
 
 Speed.prototype.validationProperties = {
     "number": {
@@ -1061,183 +1075,6 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
     },onFailedCall,appContext);
 }
 
-
-
-/**
- * Namespace for the Data table function
- */
-Speed.prototype.DataForTable = {
-    tabledata : [],
-    noOfPages : 0,
-    currentPage : 1,
-    pagesize : 30,
-    paginateSize : 5,
-    currentPos : 1,
-    lastPageItem : 0,
-    activeClass : "",
-    tablecontentId : "",
-    includeSN : true,
-    //this is responsible for paginating the table
-    paginateLinks : function(srt, end,settings) {
-        $("#noOfPages").empty();
-        $("#noOfPagesUp").empty();
-        if (end > settings.noOfPages) {
-            end = settings.noOfPages;
-        }
-        $("#noOfPages").append("<li> <a id=\"pageBack\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageBackUp\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
-        for (srt; srt <= end; srt++) {
-
-            if (srt == settings.activeClass) {
-                $("#noOfPages").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-            }
-            else {
-                $("#noOfPages").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-            }
-        }
-        $("#noOfPages").append("<li> <a id=\"pageFront\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageFrontUp\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
-        $("."+ settings.tablecontentId).click(function() {
-            settings.nextItems($(this).text(),settings);
-        });
-
-        $("."+ settings.tablecontentId + "-move").click(function() {
-            settings.moveLinks(this.id,settings);
-        });
-    },
-    //this is responsible for showing the next items the table
-    nextItems: function(id,settings) {
-        if (settings.tabledata.length != 0) {
-            $(".lin" + settings.activeClass).removeClass('active');
-            $(".lin" + id).addClass('active');
-            settings.activeClass = id;
-            $('#' + settings.tablecontentId).empty();
-            var old = id - 1;
-            var total = settings.tabledata.length;
-            var previousItem = old * settings.pagesize;
-            var nextPageItem = id * settings.pagesize;
-            if (nextPageItem > total) {
-                nextPageItem = total;
-            }
-            var str ="";
-            for (previousItem; previousItem < nextPageItem; previousItem++) {
-                str += "<tr>";
-                if(settings.includeSN){
-                    str += "<td>" + (previousItem + 1) + "</td>";
-                }
-                for (var propName in settings.tabledata[previousItem]) {
-                    if(settings.propertiesHandler.hasOwnProperty(propName)){
-                        str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem]) + "</td>";
-                    }
-                    else
-                        str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
-                }
-                str += "</tr>";
-            }
-            $('#' + settings.tablecontentId).append(str);
-        }
-    },
-    //this is responsible for moving to the new set of links
-    moveLinks : function (id,settings) {
-        id = id.slice(0, 9);
-        if (id == "pageFront") {
-            settings.currentPos = settings.currentPos + settings.paginateSize;
-            var startPos = settings.currentPos;
-            var endPos = startPos + settings.paginateSize - 1;
-            if (endPos >= settings.noOfPages) {
-                endPos = settings.noOfPages;
-            }
-            settings.paginateLinks(startPos, endPos, settings);
-            $("#pageBack").show();
-            $("#pageBackUp").show();
-            if (endPos >= settings.noOfPages) {
-                $("#pageFront").hide();
-                $("#pageFrontUp").hide();
-            }
-        }
-        else {
-            settings.currentPos = settings.currentPos - settings.paginateSize;
-            var startPos = settings.currentPos;
-            var endPos = startPos + settings.paginateSize - 1;
-            if (startPos <= 1) {
-                startPos = 1;
-                currentPos = 1;
-            }
-            settings.paginateLinks(startPos, endPos, settings);
-            $("#pageFront").show();
-            $("#pageFrontUp").show();
-            if (startPos <= 1) {
-                $("#pageBack").hide();
-                $("#pageBackUp").hide();
-            }
-        }
-    },
-    propertiesHandler : {}
-}
-
-/**
- * Exports a List to an Table. Creates the TBody content of a list based on the query
- * @param {String} SpeedContext the speedpoint object
- * @param {String} listName this parameter specifices the list which the data are to be retrieved
- * @param {String} caml this parameter specifices the caml query to be used for the list
- * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
- *  * @param {function} conditions this parameter includes special conditions for each object properties, condition must return an object
- * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
- * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
- * from there
- */
-Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
-    SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
-    this.getListToItems(SpeedContext, listName, caml, controls,true, conditions, function (requestItems) {
-        //gets only table controls
-        var tableControls = SpeedContext.getControls(true);
-        SpeedContext.DataForTable.tabledata = requestItems;
-        var Arr = SpeedContext.DataForTable.tabledata;
-        if (Arr.length != 0) {
-            $('#' + SpeedContext.DataForTable.tablecontentId).empty();
-            SpeedContext.DataForTable.activeClass = 1;
-            var total = Arr.length;
-            SpeedContext.DataForTable.noOfPages = Math.ceil(Arr.length / SpeedContext.DataForTable.pagesize);
-            if (total < SpeedContext.DataForTable.lastPageItem) {
-                SpeedContext.DataForTable.lastPageItem = total;
-            }
-            var str = "";
-            for (x = 0; x < SpeedContext.DataForTable.lastPageItem; x++) {
-                str += "<tr>";
-                if(SpeedContext.DataForTable.includeSN){
-                    str += "<td>" + (x + 1) + "</td>";
-                }
-                for (var propName in Arr[x]) {
-                    if($.inArray(propName, tableControls) >= 0){
-                        if(SpeedContext.DataForTable.propertiesHandler.hasOwnProperty(propName)){
-                            str += "<td>" + SpeedContext.DataForTable.propertiesHandler[propName](Arr[x]) + "</td>";
-                        }
-                        else
-                            str += "<td>" + Arr[x][propName] + "</td>";
-                    }
-                }
-                str += "</tr>";
-            }
-            $('#' + SpeedContext.DataForTable.tablecontentId).append(str);
-            SpeedContext.DataForTable.paginateLinks(1, SpeedContext.DataForTable.paginateSize,SpeedContext.DataForTable);
-            $("#pageBack").hide();
-            $("#pageBackUp").hide();
-            if (SpeedContext.DataForTable.noOfPages <= SpeedContext.DataForTable.paginateSize) {
-                $("#pageFront").hide();
-                $("#pageFrontUp").hide();
-            }
-        }
-        else {
-            $('#' + SpeedContext.DataForTable.tablecontentId).empty();
-        }
-        onSuccess(SpeedContext.DataForTable.tabledata);
-    }, onFailed, appContext);
-}
 /* ============================== General Section ============================*/
 /**
  * The getParameterByName function gets the value of parameters in a query string url
@@ -1278,11 +1115,16 @@ Speed.prototype.checkScriptDuplicates = function (scriptToCheck) {
 /**
  * The uniqueIdGenerator function generates a unique id 
  * @returns {String} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns a GUID number xxxxxxxx-xxxx-xxxxxxxx
+ * var guid = speedctx.uniqueIdGenerator();
  */
 Speed.prototype.uniqueIdGenerator = function () {
     var d = new Date().getTime();
     if (window.performance && typeof window.performance.now === "function") {
-        d += performance.now(); //use high-precision timer if available
+        d += performance.now();
     }
     var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = (d + Math.random() * 16) % 16 | 0;
@@ -1295,6 +1137,11 @@ Speed.prototype.uniqueIdGenerator = function () {
 /**
  * The serverDate function gets the current sharepoint server date time
  * @returns {Date} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the date on the sharepoint server
+ * var serverdate = speedctx.serverDate();
  */
 Speed.prototype.serverDate = function () {
     return new Date(new Date().getTime() + _spPageContextInfo.clientServerTimeDelta);
@@ -1417,15 +1264,35 @@ Speed.prototype.stringnifyDate = function (obj) {
 };
 
 /**
- * The checkNull function checks if a string is null
- * @param {String} val parameter supplies a string to check for null
+ * The checkNull function checks if a value is null. it returns the value if its not null and and empty string when it is
+ * This is used to avoid unexpected result when retrieving values columns that are empty
+ * @param {String} val parameter supplies a value to check for null
  * @returns {String} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns an empty string "" since check value is null
+ * var checkvalue = null
+ * var returnedValue = speedctx.checkNull(checkvalue);
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the string "Sam"
+ * var checkvalue = "sam"
+ * var returnedValue = speedctx.checkNull(checkvalue);
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the object {text: "Sam"}
+ * var checkvalue = {text: "Sam"}
+ * var returnedValue = speedctx.checkNull(checkvalue);
  */
 Speed.prototype.checkNull = function (val) {
-    if(typeof val == "boolean")
-        return val;
-    else if (val != null) {
+    if(typeof val == "string")
         return val.toString().replace(/(?:\r\n|\r|\n)/g, '<br />');
+    else if (val != null) {
+        return val;
     }
     else
         return '';
@@ -2512,11 +2379,7 @@ Speed.prototype.onQueryFailed = function(sender, args){
         console.log('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
 }
 
-/**
- * This function tells you if you working on a cache script file (Works for OnPremise Development Only)
- * @param {String} scriptToCheck the source of the script you want to check for caching
- * @returns {object} cache object which contains the version , fileChanged(bool) , previousSize, currentSize properties
- */
+//work in progress
 Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
     if(window["localStorage"]){
         var scriptTag = null;
@@ -2587,4 +2450,176 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
     else{
         console.warn("Script debugger function only works with local storage.....");
     }
+}
+
+
+/* ============================== Table Section ============================*/
+/**
+ * Exports a List to an Table. Creates the TBody content of a list based on the query
+ * @param {String} SpeedContext the speedpoint object
+ * @param {String} listName this parameter specifices the list which the data are to be retrieved
+ * @param {String} caml this parameter specifices the caml query to be used for the list
+ * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
+ * @param {Function} conditions this parameter includes special conditions for each object properties, condition must return an object
+ * @param {Function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * @param {function} [onFailed = function] this parameter is the call back function thats called when the function fails, by default onQueryFailed is called when all sharepoint async calls fail
+ * @param {object} [appContext = Object] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
+    SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
+    this.getListToItems(SpeedContext, listName, caml, controls,true, conditions, function (requestItems) {
+        //gets only table controls
+        var tableControls = SpeedContext.getControls(true);
+        SpeedContext.DataForTable.tabledata = requestItems;
+        var Arr = SpeedContext.DataForTable.tabledata;
+        if (Arr.length != 0) {
+            $('#' + SpeedContext.DataForTable.tablecontentId).empty();
+            SpeedContext.DataForTable.activeClass = 1;
+            var total = Arr.length;
+            SpeedContext.DataForTable.noOfPages = Math.ceil(Arr.length / SpeedContext.DataForTable.pagesize);
+            if (total < SpeedContext.DataForTable.lastPageItem) {
+                SpeedContext.DataForTable.lastPageItem = total;
+            }
+            var str = "";
+            for (x = 0; x < SpeedContext.DataForTable.lastPageItem; x++) {
+                str += "<tr>";
+                if(SpeedContext.DataForTable.includeSN){
+                    str += "<td>" + (x + 1) + "</td>";
+                }
+                for (var propName in Arr[x]) {
+                    if($.inArray(propName, tableControls) >= 0){
+                        if(SpeedContext.DataForTable.propertiesHandler.hasOwnProperty(propName)){
+                            str += "<td>" + SpeedContext.DataForTable.propertiesHandler[propName](Arr[x]) + "</td>";
+                        }
+                        else
+                            str += "<td>" + Arr[x][propName] + "</td>";
+                    }
+                }
+                str += "</tr>";
+            }
+            $('#' + SpeedContext.DataForTable.tablecontentId).append(str);
+            SpeedContext.DataForTable.paginateLinks(1, SpeedContext.DataForTable.paginateSize,SpeedContext.DataForTable);
+            $("#pageBack").hide();
+            $("#pageBackUp").hide();
+            if (SpeedContext.DataForTable.noOfPages <= SpeedContext.DataForTable.paginateSize) {
+                $("#pageFront").hide();
+                $("#pageFrontUp").hide();
+            }
+        }
+        else {
+            $('#' + SpeedContext.DataForTable.tablecontentId).empty();
+        }
+        onSuccess(SpeedContext.DataForTable.tabledata);
+    }, onFailed, appContext);
+}
+
+Speed.prototype.DataForTable = {
+    tabledata : [],
+    noOfPages : 0,
+    currentPage : 1,
+    pagesize : 30,
+    paginateSize : 5,
+    currentPos : 1,
+    lastPageItem : 0,
+    activeClass : "",
+    tablecontentId : "",
+    includeSN : true,
+    //this is responsible for paginating the table
+    paginateLinks : function(srt, end,settings) {
+        $("#noOfPages").empty();
+        $("#noOfPagesUp").empty();
+        if (end > settings.noOfPages) {
+            end = settings.noOfPages;
+        }
+        $("#noOfPages").append("<li> <a id=\"pageBack\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
+        $("#noOfPagesUp").append("<li> <a id=\"pageBackUp\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
+        for (srt; srt <= end; srt++) {
+
+            if (srt == settings.activeClass) {
+                $("#noOfPages").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+                $("#noOfPagesUp").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+            }
+            else {
+                $("#noOfPages").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+                $("#noOfPagesUp").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+            }
+        }
+        $("#noOfPages").append("<li> <a id=\"pageFront\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
+        $("#noOfPagesUp").append("<li> <a id=\"pageFrontUp\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
+        $("."+ settings.tablecontentId).click(function() {
+            settings.nextItems($(this).text(),settings);
+        });
+
+        $("."+ settings.tablecontentId + "-move").click(function() {
+            settings.moveLinks(this.id,settings);
+        });
+    },
+    //this is responsible for showing the next items the table
+    nextItems: function(id,settings) {
+        if (settings.tabledata.length != 0) {
+            $(".lin" + settings.activeClass).removeClass('active');
+            $(".lin" + id).addClass('active');
+            settings.activeClass = id;
+            $('#' + settings.tablecontentId).empty();
+            var old = id - 1;
+            var total = settings.tabledata.length;
+            var previousItem = old * settings.pagesize;
+            var nextPageItem = id * settings.pagesize;
+            if (nextPageItem > total) {
+                nextPageItem = total;
+            }
+            var str ="";
+            for (previousItem; previousItem < nextPageItem; previousItem++) {
+                str += "<tr>";
+                if(settings.includeSN){
+                    str += "<td>" + (previousItem + 1) + "</td>";
+                }
+                for (var propName in settings.tabledata[previousItem]) {
+                    if(settings.propertiesHandler.hasOwnProperty(propName)){
+                        str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem]) + "</td>";
+                    }
+                    else
+                        str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
+                }
+                str += "</tr>";
+            }
+            $('#' + settings.tablecontentId).append(str);
+        }
+    },
+    //this is responsible for moving to the new set of links
+    moveLinks : function (id,settings) {
+        id = id.slice(0, 9);
+        if (id == "pageFront") {
+            settings.currentPos = settings.currentPos + settings.paginateSize;
+            var startPos = settings.currentPos;
+            var endPos = startPos + settings.paginateSize - 1;
+            if (endPos >= settings.noOfPages) {
+                endPos = settings.noOfPages;
+            }
+            settings.paginateLinks(startPos, endPos, settings);
+            $("#pageBack").show();
+            $("#pageBackUp").show();
+            if (endPos >= settings.noOfPages) {
+                $("#pageFront").hide();
+                $("#pageFrontUp").hide();
+            }
+        }
+        else {
+            settings.currentPos = settings.currentPos - settings.paginateSize;
+            var startPos = settings.currentPos;
+            var endPos = startPos + settings.paginateSize - 1;
+            if (startPos <= 1) {
+                startPos = 1;
+                currentPos = 1;
+            }
+            settings.paginateLinks(startPos, endPos, settings);
+            $("#pageFront").show();
+            $("#pageFrontUp").show();
+            if (startPos <= 1) {
+                $("#pageBack").hide();
+                $("#pageBackUp").hide();
+            }
+        }
+    },
+    propertiesHandler : {}
 }
