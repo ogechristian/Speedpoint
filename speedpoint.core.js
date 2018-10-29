@@ -590,6 +590,8 @@ Speed.prototype.htmlBind = function (listObjects) {
     }
 }
 
+
+//================= work in progress ============
 Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tableProperties) {
     for (var key in listObjects) {
         if (listObjects.hasOwnProperty(key)) {
@@ -1320,6 +1322,13 @@ Speed.prototype.removeHtml = function (val) {
  * The redirect function redirects to the specified page
  * @param {String} url the parameter supplies the url to redirect to
  * @param {bool} [opt= true] the parameter sets if the previous url is available in the history or not after redirecting
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //redirects from the current page to the url passed. the current page is saved in history
+ * speedCtx.redirect("/homepage.aspx");
+ * //redirects from the current page to the url passed. the current page is cleared from history
+ * speedCtx.redirect("/homepage.aspx",false);
  */
 Speed.prototype.redirect = function (url, opt) {
     var opt = (typeof opt === 'undefined') ? true : opt;
@@ -1333,6 +1342,11 @@ Speed.prototype.redirect = function (url, opt) {
  * The numberWithCommas function returns numbers with comma seperation
  * @param {Int} numberToConvert the parameter supplies the number to add the commas to
  * @returns {String} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns a number with currency comma limit. 2,000,000 is returned
+ * var money = speedCtx.numberWithCommas(2000000);
  */
 Speed.prototype.numberWithCommas = function (numberToConvert) {
     return numberToConvert.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -1377,31 +1391,15 @@ Speed.prototype.xmlToJson = function (xml) {
     }
     return obj;
 }
-
-/**
- * The returnValidFileName function returns a valid file name or error codes (0) for invalid file extensions , 1 for mulitple fullstops
- * @param {String} val the parameter supplies the file name
- * @returns {String} the result output.
- */
-Speed.prototype.returnValidFileName = function (val) {
-    var returnStr;
-    var result = val.replace(/_|#|\\|\/|-\ |\(|\)|\&|\@|\!|\$|\%|\^|\*|\+|\=|\[|\]|\{|\}|\'|\"|\<|\>|\?|/g, '');
-    var meko = (result.match(/\./g) || []).length;
-    if (meko == 1) {
-        var splitedStr = result.split(".");
-        if (splitedStr[1].length <= 4)
-            returnStr = result;
-        else
-            returnStr = "0";
-    }
-    else
-        returnStr = "1";
-    return returnStr;
-}
 //------------------------------
 /**
- * The clearFileInput function clears file input for all browsers
+ * The clearFileInput function clears file input selection for input of type='file' for all browsers
  * @param {node} elementObj the parameter supplies the element node
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //the selection for input of id fileid is cleared
+ * speedCtx.clearFileInput(document.getElementById("fileid"));
  */
 Speed.prototype.clearFileInput = function (elementObj) {
     try {
@@ -1419,6 +1417,13 @@ Speed.prototype.clearFileInput = function (elementObj) {
  * @param {Date} second date to  make difference from
  * @param {String} format for the difference
  * @returns {Int} the difference
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * var date1 = speedCtx.serverDate();
+ * var date2 = new Date("27-10-2018");
+ * //dateDifference returns the Integer value of the difference between the two dates
+ * var dateDifference = speedCtx.differenceBtwDates(date1,date2,"minutes");
  */
 Speed.prototype.differenceBtwDates = function (date1, date2, dateFormat) {
     var formatToUse = (typeof dateFormat === "undefined") ? "day" : dateFormat;
@@ -1499,17 +1504,51 @@ String.prototype.SPDomainLoginFromFullLogin = function () {
     return returnSplit;
 }
 
-Speed.prototype.formatStringJSON = function (val, stringType) {
+/**
+ * The JSONToObject function returns a valid object. this is used to ensure a string is of a proper object type before
+ * using JSON.parse on the string.
+ * @param {String} val this parameter is the value you want to validate
+ * @param {String} [stringType = "Array"] this parameter indicated the object type you are expecting Array or object. 
+ * Array is the default if nothing is passed to this parameter.
+ * @returns {object} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns stringToCheck as an object
+ * var stringToCheck = "{"sample": "test","view": "23"}";
+ * var newObject = speedCtx.JSONToObject(stringToCheck,"object");
+ * 
+ * //returns stringToCheck as an array. the second parameter is omited because the default value is Array
+ * var stringToCheck = "["sample","test","view","23"]";
+ * var newArrayObject = speedCtx.JSONToObject(stringToCheck);
+ * OR
+ * var newArrayObject = speedCtx.JSONToObject(stringToCheck,"Array");
+ * 
+ * //if an invalid object is passed and empty object or array is returned based on the string type passed
+ * //returns stringToCheck as an empty object {}
+ * var stringToCheck = "{sample: "test",view": "23"}";
+ * var newObject = speedCtx.JSONToObject(stringToCheck,"object");
+ */
+Speed.prototype.JSONToObject = function (val, stringType) {
+    var returnObj;
     var typeToUse = (typeof stringType == "undefined") ? "Array" : stringType;
     if (val == null || val === "") {
         if (typeToUse == "Array")
-            return "[]";
+            returnObj = "[]";
         else
-            return "{}";
+            returnObj = "{}";
     }
-    else {
-        return val;
+    
+    try{
+        returnObj = JSON.parse(returnObj);
     }
+    catch{
+        if (typeToUse == "Array")
+            returnObj = [];
+        else
+            returnObj = {};
+    }
+    return returnObj;
 }
 
 /*============================= Email Section =========================*/
@@ -2474,7 +2513,6 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
         console.warn("Script debugger function only works with local storage.....");
     }
 }
-
 
 /* ============================== Table Section ============================*/
 /**
