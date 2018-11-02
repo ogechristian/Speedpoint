@@ -492,7 +492,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             });
             arrayValue.push(objValue);
         });
-        if (strignify == "YES")
+        if (strignify.toLowerCase() == "yes")
             returnObject[property] = JSON.stringify(arrayValue);
         else
         returnObject[property] = arrayValue;
@@ -1083,6 +1083,12 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
  * @param {String} name parameter name
  * @param {String} url url to check for value
  * @returns {String} the parameter value.
+ * @example
+ * var urlOfPage = http://speedpoint.sharepoint.com?itemid=200
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the value 200 for the itemid parameter in the url
+ * var itemID = speedctx.getParameterByName("itemid", urlOfPage);
  */
 Speed.prototype.getParameterByName = function (name, url) {
     if (!url) url = window.location.href;
@@ -1153,6 +1159,20 @@ Speed.prototype.serverDate = function () {
  * The stringnifyDate function converts a date object to string
  * @param {Object} [obj = {value: this.serverDate}] parameter supplies a settings object for converting to string. by default the server date is used
  * @returns {String} the result output.
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //returns the string of the current date in format dd/mm/yy
+ * var stringDate = speedctx.stringnifyDate();
+ * 
+ * //returns the string of the current date in format dd/mm/yy and includes time
+ * var stringDate = speedctx.stringnifyDate({includeTime : true});
+ * 
+ * //returns the string of the time passed in the value parameter in format dd/mm/yy and includes time
+ * var stringDate = speedctx.stringnifyDate({includeTime : true, value : "10/10/2018"});
+ * 
+ * //returns the string of the time passed in the value parameter in format mm-dd-yy and includes time with no spacing between the time
+ * var stringDate = speedctx.stringnifyDate({includeTime : true, value : "10/10/2018", format : "mm-dd-yy", timeSpace : false});
  */
 Speed.prototype.stringnifyDate = function (obj) {
     if (typeof obj == "undefined") obj = {};
@@ -1542,7 +1562,7 @@ Speed.prototype.JSONToObject = function (val, stringType) {
     try{
         returnObj = JSON.parse(returnObj);
     }
-    catch{
+    catch(e){
         if (typeToUse == "Array")
             returnObj = [];
         else
@@ -1555,14 +1575,32 @@ Speed.prototype.JSONToObject = function (val, stringType) {
 /**
  * The sendSPEmail function sends email to to users sync with sharepoint userprfile (within the organisation)
  * @param {String} from the from address
- * @param {String} to the to address 
+ * @param {Array} to an array of email address the mail will be sent to 
  * @param {String} body the content of the email
- * @param {array} [cc= []] the copy mails , an array of strings
+ * @param {Array} [cc= []] the copy mails , an array of strings, these mail address will be in copy
  * @param {String} subject the subject of the mail
- * @param {function} callBack this parameter is the call back function thats called when the function is successful or failed
+ * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed
  * @param {String} [relative = "Currentpage url is used"] this parameter changes the location of the SP utility API
- * @returns {string} this parameter is passed to the callBack function as the first parameter, the string indicates if the function call was successful
- * @returns {object} this parameter is passed to the callBack function as the second parameter, object provides the data for the send email call
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //send mails to users in the to array, no users in copy (empty array passed)
+ * var to = ["sptest@mail.com"];
+ * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",[], "subject",function(status, data){
+ *      if(status === "success")
+ *          console.log("mail sent");
+ *      else
+ *          console.log("mail failed");
+ * });
+ * 
+ * //send mails to users in the to array and users are in copy
+ * var to = ["sptest@mail.com","sptest2@mail.com"];
+ * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",["sptest1@mail.com","sptest2@mail.com"], "subject",function(status, data){
+ *      if(status === "success")
+ *          console.log("mail sent");
+ *      else
+ *          console.log("mail failed");
+ * });
  */
 Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, relative) {
     //Get the relative url of the site
@@ -1614,8 +1652,38 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
         }
     });
 }
-/*
-* Same Parameters with SendSPEmail but the to array contains string of the full login name
+
+/**
+ * Same Parameters with SendSPEmail but the to array contains string of the login name instead of emails
+ * Best to use for sharepoint on premise where emails can be changed and are unpredictable.
+ * Send mails by login ensures mails are sent because login name will not change
+ * @param {String} from the from address
+ * @param {Array} to an array of login name the mail will be sent to 
+ * @param {String} body the content of the email
+ * @param {Array} [cc= []] the copy login name , an array of strings, these login name will be in copy
+ * @param {String} subject the subject of the mail
+ * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed
+ * @param {String} [relative = "Currentpage url is used"] this parameter changes the location of the SP utility API
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //send mails to users in the to array, no users in copy (empty array passed)
+ * var to = ["sptest"];
+ * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",[], "subject",function(status, data){
+ *      if(status === "success")
+ *          console.log("mail sent");
+ *      else
+ *          console.log("mail failed");
+ * });
+ * 
+ * //send mails to users in the to array and users are in copy
+ * var to = ["sptest","sptest2"];
+ * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",["sptest1","sptest2"], "subject",function(status, data){
+ *      if(status === "success")
+ *          console.log("mail sent");
+ *      else
+ *          console.log("mail failed");
+ * });
 */
 Speed.prototype.sendSPEmailByLogin = function(from, to, body, cc, subject,onSuccess,relative) {
     //Get the relative url of the site
