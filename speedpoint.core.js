@@ -457,6 +457,29 @@ Speed.prototype.bind = function (listObjects, staticBind) {
         }
     }
 
+    //bind people picker
+    var elementPeople = document.querySelectorAll("[speed-bind-people]");
+    for (var i = 0; i <= (elementPeople.length - 1); i++) {
+        var property = elementPeople[i].getAttribute("speed-bind-people");
+        var msg = elementPeople[i].getAttribute("speed-validate-msg");
+        var useJson = (elementPeople[i].getAttribute("speed-people-JSON") == "Yes") ? true : false;
+        var inputid = elementPeople[i].getAttribute("id");
+        var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
+        var validationtype = "text";
+        var pickerID = inputid + '_TopSpan';
+        if (SPClientPeoplePicker !== null) {
+            var peopleDict = SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID];
+
+            var userObject = this.getUsersFromPicker(peopleDict);
+            if (userObject.length !== 0) {
+                if (useJson)
+                    returnObject[property] = userObject;
+            }
+            else
+                this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+        }
+    }
+
     //Speed bind and table to array
     var elementValidate = document.querySelectorAll("[speed-bind-table]");
     for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
@@ -1662,7 +1685,8 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
  * @param {String} body the content of the email
  * @param {Array} [cc= []] the copy login name , an array of strings, these login name will be in copy
  * @param {String} subject the subject of the mail
- * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed
+ * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed. two arguments are passed to the call back
+ * status: which tells you if the request is successful or failed and data: contains information about the mail sent
  * @param {String} [relative = "Currentpage url is used"] this parameter changes the location of the SP utility API
  * @example
  * // returns a normal context related to the current site
@@ -1857,6 +1881,12 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
  * The setPeoplePickerValue function sets a user value for a people picker
  * @param {Object} peoplePickerObj this parameter provides the people picker dictionary object which the user will be set
  * @param {String} userLogin this parameter provides the login of the user that will be set
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the pickerDictionaryObj can be obtained when creating a people picker using initializePeoplePicker. it is returned as an argument in the callback
+ * speedCtx.setPeoplePickerValue(pickerDictionaryObj, "sptest");
  */
 Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
     var peoplePicker = peoplePickerObj
@@ -1867,6 +1897,11 @@ Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
 /**
  * The clearPicker function clears the value of a people picker
  * @param {Object} people this parameter provides the people picker dictionary object which is to be cleared
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the pickerDictionaryObj can be obtained when creating a people picker using initializePeoplePicker. it is returned as an argument in the callback
+ * speedCtx.clearPicker(pickerDictionaryObj);
  */
 Speed.prototype.clearPicker = function (people) {
     //var people = this.SPClientPeoplePicker.SPClientPeoplePickerDict['relievee_TopSpan'];
@@ -1882,10 +1917,10 @@ Speed.prototype.clearPicker = function (people) {
 /* ============================== User Section Section ============================*/
 /**
  * The currentUserDetails function gets current logged in user details
- * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callBack} callback this parameter is the call back function when the function is successful. an User object is passed as an argument to this called back
+ * this argument can be used to retrieve details of the current user
+ * @param {callBack} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} a sharepoint user object
  */
 Speed.prototype.currentUserDetails = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
