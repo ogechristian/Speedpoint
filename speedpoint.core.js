@@ -2678,48 +2678,49 @@ Speed.prototype.getListToTable = function (SpeedContext, listName, caml, control
 }
 
 Speed.prototype.DataForTable = {
-    tabledata : [],
-    noOfPages : 0,
-    currentPage : 1,
-    pagesize : 30,
-    paginateSize : 5,
-    currentPos : 1,
-    lastPageItem : 0,
-    activeClass : "",
-    tablecontentId : "",
-    includeSN : true,
+    tabledata: [],
+    noOfPages: 0,
+    currentPage: 1,
+    pagesize: 30,
+    paginateSize: 5,
+    currentPos: 1,
+    lastPageItem: 0,
+    activeClass: "",
+    tablecontentId: "",
+    includeSN: true,
+    context: null,
     //this is responsible for paginating the table
-    paginateLinks : function(srt, end,settings) {
+    paginateLinks: function (srt, end, settings) {
         $("#noOfPages").empty();
         $("#noOfPagesUp").empty();
         if (end > settings.noOfPages) {
             end = settings.noOfPages;
         }
-        $("#noOfPages").append("<li> <a id=\"pageBack\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageBackUp\" class='"+ settings.tablecontentId +"-move'><<</a> </li>");
+        $("#noOfPages").append("<li> <a id=\"pageBack\" class='" + settings.tablecontentId + "-move'><<</a> </li>");
+        $("#noOfPagesUp").append("<li> <a id=\"pageBackUp\" class='" + settings.tablecontentId + "-move'><<</a> </li>");
         for (srt; srt <= end; srt++) {
 
             if (srt == settings.activeClass) {
-                $("#noOfPages").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + " active\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+                $("#noOfPages").append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                $("#noOfPagesUp").append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
             }
             else {
-                $("#noOfPages").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + "\"> <a class='"+ settings.tablecontentId +"'>" + srt + "</a> </li>");
+                $("#noOfPages").append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                $("#noOfPagesUp").append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
             }
         }
-        $("#noOfPages").append("<li> <a id=\"pageFront\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageFrontUp\" class='"+ settings.tablecontentId +"-move'>>></a> </li>");
-        $("."+ settings.tablecontentId).click(function() {
-            settings.nextItems($(this).text(),settings);
+        $("#noOfPages").append("<li> <a id=\"pageFront\" class='" + settings.tablecontentId + "-move'>>></a> </li>");
+        $("#noOfPagesUp").append("<li> <a id=\"pageFrontUp\" class='" + settings.tablecontentId + "-move'>>></a> </li>");
+        $("." + settings.tablecontentId).click(function () {
+            settings.nextItems($(this).text(), settings);
         });
 
-        $("."+ settings.tablecontentId + "-move").click(function() {
-            settings.moveLinks(this.id,settings);
+        $("." + settings.tablecontentId + "-move").click(function () {
+            settings.moveLinks(this.id, settings);
         });
     },
     //this is responsible for showing the next items the table
-    nextItems: function(id,settings) {
+    nextItems: function (id, settings) {
         if (settings.tabledata.length != 0) {
             $(".lin" + settings.activeClass).removeClass('active');
             $(".lin" + id).addClass('active');
@@ -2732,18 +2733,21 @@ Speed.prototype.DataForTable = {
             if (nextPageItem > total) {
                 nextPageItem = total;
             }
-            var str ="";
+            var str = "";
+            var tableControls = settings.context.getControls(true);
             for (previousItem; previousItem < nextPageItem; previousItem++) {
                 str += "<tr>";
-                if(settings.includeSN){
+                if (settings.includeSN) {
                     str += "<td>" + (previousItem + 1) + "</td>";
                 }
                 for (var propName in settings.tabledata[previousItem]) {
-                    if(settings.propertiesHandler.hasOwnProperty(propName)){
-                        str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem]) + "</td>";
+                    if ($.inArray(propName, tableControls) >= 0) {
+                        if (settings.propertiesHandler.hasOwnProperty(propName)) {
+                            str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem]) + "</td>";
+                        }
+                        else
+                            str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
                     }
-                    else
-                        str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
                 }
                 str += "</tr>";
             }
@@ -2751,7 +2755,7 @@ Speed.prototype.DataForTable = {
         }
     },
     //this is responsible for moving to the new set of links
-    moveLinks : function (id,settings) {
+    moveLinks: function (id, settings) {
         id = id.slice(0, 9);
         if (id == "pageFront") {
             settings.currentPos = settings.currentPos + settings.paginateSize;
@@ -2785,5 +2789,5 @@ Speed.prototype.DataForTable = {
             }
         }
     },
-    propertiesHandler : {}
+    propertiesHandler: {}
 }
