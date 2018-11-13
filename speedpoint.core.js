@@ -253,6 +253,27 @@ Speed.prototype.validationProperties = {
             return value;
         }
     },
+    "email": {
+        type: "email",
+        extend: {
+            Email: function (value) {
+                var patt = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
+                if (!patt.test(value)) {
+                    return false;
+                }
+                else
+                    return true;
+            }
+        },
+        validate: function (value, extension) {
+            if (extension !== "") {
+                return this.extend[extension](value);
+            }
+            else{
+                return this.extend["Email"](value);
+            }
+        }
+    },
     "text": {
         type: "text",
         extend: {
@@ -414,6 +435,7 @@ Speed.prototype.checkPassedValidation = function () {
  */
 //========================== SpeedPoint Binding Section =======================
 Speed.prototype.bind = function (listObjects, staticBind) {
+    this.clearValidation();
     var bindStaticFields = (typeof staticBind === 'undefined') ? true : staticBind;
     var returnObject = {}
     if (typeof listObjects !== "undefined" && listObjects != null) {
@@ -484,7 +506,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
     var elementValidate = document.querySelectorAll("[speed-bind-table]");
     for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
         var property = elementValidate[i].getAttribute("speed-bind-table");
-        var strignify = elementValidate[i].getAttribute("speed-bind-JSON");
+        var strignify = (elementValidate[i].getAttribute("speed-bind-JSON") == "Yes") ? true : false;
         var inputid = elementValidate[i].getAttribute("id");
         var objproperties = [];
         $("#" + inputid + " > thead > tr > th").each(function () {
@@ -515,7 +537,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             });
             arrayValue.push(objValue);
         });
-        if (strignify.toLowerCase() == "yes")
+        if (strignify)
             returnObject[property] = JSON.stringify(arrayValue);
         else
         returnObject[property] = arrayValue;
@@ -985,48 +1007,50 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
     context.executeQueryAsync(function () {
         var objectToReturn = {};
         var items = window.speedGlobal[total].getItemAtIndex(0);
-        for (var i = 0; i <= (controlArray.length - 1) ; i++) {
-            var SPFieldType;
-            try {
-                SPFieldType = items.get_item(controlArray[i]).__proto__.constructor.__typeName.toLowerCase();
-            }
-            catch (ex) {
-                SPFieldType = "string";
-            }
-            if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
-                var objProp = {};
-                objProp.id = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupId());
-                objProp.value = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupValue());
-                if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
-                    try {
-                        objProp.email = SpeedContext.checkNull(items.get_item(controlArray[i]).get_email());
-                    }
-                    catch (e) {
-                        objProp.email = "";
-                     };
+        if (typeof items !== "undefined") {
+            for (var i = 0; i <= (controlArray.length - 1) ; i++) {
+                var SPFieldType;
+                try {
+                    SPFieldType = items.get_item(controlArray[i]).__proto__.constructor.__typeName.toLowerCase();
                 }
-                objectToReturn[controlArray[i]] = objProp;
-            }
-            else if (SPFieldType.toLowerCase() === "array") {
-                var multiUser = items.get_item(controlArray[i]);
-                var arrayToSave = [];
-                for (var j = 0; j <= (multiUser.length - 1); j++) {
-                    var objectOfUsers = {};
-                    objectOfUsers.id = multiUser[j].get_lookupId();
-                    objectOfUsers.value = multiUser[j].get_lookupValue();
-                    try {
-                        objectOfUsers.email = multiUser[j].get_email();
-                    }
-                    catch (e) {
-                        objectOfUsers.email = "";
-                     };
-                    arrayToSave.push(objectOfUsers);
+                catch (ex) {
+                    SPFieldType = "string";
                 }
-                objectToReturn[controlArray[i]] = arrayToSave;
-            }
-            else
-                objectToReturn[controlArray[i]] = SpeedContext.checkNull(items.get_item(controlArray[i]));
+                if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
+                    var objProp = {};
+                    objProp.id = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupId());
+                    objProp.value = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupValue());
+                    if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
+                        try {
+                            objProp.email = SpeedContext.checkNull(items.get_item(controlArray[i]).get_email());
+                        }
+                        catch (e) {
+                            objProp.email = "";
+                        };
+                    }
+                    objectToReturn[controlArray[i]] = objProp;
+                }
+                else if (SPFieldType.toLowerCase() === "array") {
+                    var multiUser = items.get_item(controlArray[i]);
+                    var arrayToSave = [];
+                    for (var j = 0; j <= (multiUser.length - 1); j++) {
+                        var objectOfUsers = {};
+                        objectOfUsers.id = multiUser[j].get_lookupId();
+                        objectOfUsers.value = multiUser[j].get_lookupValue();
+                        try {
+                            objectOfUsers.email = multiUser[j].get_email();
+                        }
+                        catch (e) {
+                            objectOfUsers.email = "";
+                        };
+                        arrayToSave.push(objectOfUsers);
+                    }
+                    objectToReturn[controlArray[i]] = arrayToSave;
+                }
+                else
+                    objectToReturn[controlArray[i]] = SpeedContext.checkNull(items.get_item(controlArray[i]));
 
+            }
         }
         onSuccess(objectToReturn);
     }
@@ -1047,17 +1071,17 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
  * from there
  */
-Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls,tableonly,conditions, onSuccess, onFailed, appContext) {
+Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls, tableonly, conditions, onSuccess, onFailed, appContext) {
     var controlArray = this.getControls(tableonly);
     var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
-    
-    this.getItem(listName,caml,function(itemProperties){
+
+    this.getItem(listName, caml, function (itemProperties) {
         var listItems = [];
         var listEnumerator = itemProperties.getEnumerator();
-		while (listEnumerator.moveNext()) {
+        while (listEnumerator.moveNext()) {
             var objectToReturn = {};
-            for (var i = 0; i <= (controlsToUse.length - 1) ; i++) {
+            for (var i = 0; i <= (controlsToUse.length - 1); i++) {
                 var SPFieldType;
                 try {
                     SPFieldType = listEnumerator.get_current().get_item(controlsToUse[i]).__proto__.constructor.__typeName.toLowerCase();
@@ -1069,20 +1093,34 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
                     var objProp = {};
                     objProp.id = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]).get_lookupId());
                     objProp.value = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]).get_lookupValue());
+                    if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
+                        try {
+                            objProp.email = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_email());
+                        }
+                        catch (e) {
+                            objProp.email = "";
+                        };
+                    }
                     objectToReturn[controlsToUse[i]] = objProp;
                 }
                 else if (SPFieldType.toLowerCase() === "array") {
-                    var multiUser = items.get_item(controlArray[i]);
+                    var multiUser = items.get_item(controlsToUse[i]);
                     var arrayToSave = [];
                     for (var j = 0; j <= (multiUser.length - 1); j++) {
                         var objectOfUsers = {};
                         objectOfUsers.id = multiUser[j].get_lookupId();
                         objectOfUsers.value = multiUser[j].get_lookupValue();
+                        try {
+                            objectOfUsers.email = multiUser[j].get_email();
+                        }
+                        catch (e) {
+                            objectOfUsers.email = "";
+                        };
                         arrayToSave.push(objectOfUsers);
                     }
-                    objectToReturn[controlArray[i]] = arrayToSave;
+                    objectToReturn[controlsToUse[i]] = arrayToSave;
                 }
-                else{
+                else {
                     objectToReturn[controlsToUse[i]] = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]));
                 }
             }
@@ -1097,7 +1135,7 @@ Speed.prototype.getListToItems = function (SpeedContext, listName, caml, control
             }
         }
         onSuccess(listItems);
-    },onFailedCall,appContext);
+    }, onFailedCall, appContext);
 }
 
 /* ============================== General Section ============================*/
@@ -1583,7 +1621,7 @@ Speed.prototype.JSONToObject = function (val, stringType) {
     }
     
     try{
-        returnObj = JSON.parse(returnObj);
+        returnObj = JSON.parse(val);
     }
     catch(e){
         if (typeToUse == "Array")
@@ -2264,41 +2302,72 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
     }
 }
 //---------Checks if user is a member of a group---------------
-Speed.prototype.isUserMemberOfGroup = function (group, bywat, userDetailsTocheck, callback, onFailed) {
+Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
     var boolVal = false;
-    var end = false
-    this.retrieveAllUsersInGroup(group, function (speedInternalGroupObj) {
-        for (var x in speedInternalGroupObj) {
-            if (typeof bywat !== 'undefined' && typeof value !== 'undefined') {
-                if (bywat == 'id') {
-                    if (speedInternalGroupObj[x].id == userDetailsTocheck) {
-                        boolVal = true;
-                        break;
-                    }
-                }
-                else if (bywat == 'login') {
-                    try {
-                        if (speedInternalGroupObj[x].logon.toLowerCase() == userDetailsTocheck.toLowerCase()) {
-                            boolVal = true;
-                            break;
-                        }
-                    }
-                    catch (e) { }
-                }
-                else if (bywat == 'email') {
-                    try {
-                        if (speedInternalGroupObj[x].email.toLowerCase() == userDetailsTocheck.toLowerCase()) {
-                            boolVal = true;
-                            break;
-                        }
-                    }
-                    catch (e) { }
-                }
+    var globalContextCount = [];
+    if (typeof groupCollection !== 'undefined') {
+        var groupFound = 0;
+        var groupsAvail = false;
+        var groupNames = groupCollection.split(";");
+        for (var i = 0; i <= (groupNames.length - 1); i++) {
+            if (boolVal) {
+                break;
             }
+            groupsAvail = true;
+            var clientContext = this.initiate();
+            var collGroup = clientContext.get_web().get_siteGroups();
+            var oGroup = collGroup.getByName(groupNames[i]);
+            window.speedGlobal.push(oGroup.get_users());
+            var total = window.speedGlobal.length;
+            total--;
+            globalContextCount.push(total);
+            clientContext.load(window.speedGlobal[total]);
+            clientContext.executeQueryAsync(function () {
+                setTimeout(function () {
+                    var totalToUse = globalContextCount[groupFound];
+                    groupFound++;
+                    var userEnumerator = window.speedGlobal[totalToUse].getEnumerator();
+                    while (userEnumerator.moveNext()) {
+                        var prop = {};
+                        var oUser = userEnumerator.get_current();
+                        prop.title = oUser.get_title();
+                        prop.id = oUser.get_id();
+                        prop.email = oUser.get_email();
+                        prop.login = oUser.get_loginName();
+                        if (typeof userDetails.login !== "undefined") {
+                            if (prop.login === userDetails.login) {
+                                boolVal = true;
+                                break;
+                            }
+                        }
+                        else if (typeof userDetails.id !== "undefined") {
+                            if (prop.id === userDetails.id) {
+                                boolVal = true;
+                                break;
+                            }
+                        }
+                        else if (typeof userDetails.email !== "undefined") {
+                            if (prop.email === userDetails.email) {
+                                boolVal = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (groupFound == groupNames.length || boolVal)
+                        callback(boolVal);
+                }, 1500);
+            }
+                , Function.createDelegate(this, onFailedCall));
         }
+        //callback called if no group was foud
+        if (groupFound == 0 && !groupsAvail) {
+            callback(boolVal);
+        }
+    }
+    else {
         callback(boolVal);
-    }, onFailedCall);
+    }
 }
 /* ============================== Document Library Section ============================*/
 //----converts data URI to Base 64------//
@@ -2646,7 +2715,12 @@ Speed.prototype.getListToTable = function (SpeedContext, listName, caml, control
             }
             var str = "";
             for (x = 0; x < SpeedContext.DataForTable.lastPageItem; x++) {
-                str += "<tr>";
+                if (SpeedContext.DataForTable.modifyTR) {
+                    str += SpeedContext.DataForTable.trExpression(x);
+                }
+                else {
+                    str += "<tr>";
+                }
                 if(SpeedContext.DataForTable.includeSN){
                     str += "<td>" + (x + 1) + "</td>";
                 }
@@ -2688,6 +2762,7 @@ Speed.prototype.DataForTable = {
     activeClass: "",
     tablecontentId: "",
     includeSN: true,
+    modifyTR: false,
     context: null,
     //this is responsible for paginating the table
     paginateLinks: function (srt, end, settings) {
@@ -2736,7 +2811,12 @@ Speed.prototype.DataForTable = {
             var str = "";
             var tableControls = settings.context.getControls(true);
             for (previousItem; previousItem < nextPageItem; previousItem++) {
-                str += "<tr>";
+                if (settings.modifyTR) {
+                    str += SpeedContext.DataForTable.trExpression(previousItem);
+                }
+                else {
+                    str += "<tr>";
+                }
                 if (settings.includeSN) {
                     str += "<td>" + (previousItem + 1) + "</td>";
                 }
