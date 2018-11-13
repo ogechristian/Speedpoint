@@ -1988,8 +1988,22 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
     ccbUser.retrieve();
     ctxt.load(ccbUser);
     ctxt.executeQueryAsync(function () {
-        setTimeout(function () {
-            callback(ccbUser);
+        //set interval is used because userProperties might not be available is server resources is down
+        var intervalCount = 0
+        var intervalRef = setInterval(function () {
+            try {
+                var userId = ccbUser.get_id();
+                clearInterval(intervalRef);
+                callback(ccbUser);
+            }
+            catch (e) {
+                intervalCount++;
+                if (intervalCount == 10) {
+                    clearInterval(intervalRef);
+                    throw "User properties is not available check server resources";
+                }
+            }
+
         }, 1000);
     }, Function.createDelegate(this, onFailedCall));
 }
@@ -2009,11 +2023,25 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
     //runtime method 
     userObject.retrieve();
     context.load(userObject);
-    context.executeQueryAsync(
-         setTimeout(function () {
-             onSuccess(userObject);
-         }, 1000),
-                Function.createDelegate(this, onFailedCall));
+    context.executeQueryAsync(function () {
+        //set interval is used because userProperties might not be available is server resources is down
+        var intervalCount = 0
+        var intervalRef = setInterval(function () {
+            try {
+                var userId = userObject.get_id();
+                clearInterval(intervalRef);
+                onSuccess(userObject);
+            }
+            catch (e) {
+                intervalCount++;
+                if (intervalCount == 10) {
+                    clearInterval(intervalRef);
+                    throw "User properties is not available check server resources";
+                }
+            }
+
+        }, 1000);
+    },Function.createDelegate(this, onFailedCall));
 }
 
 /**
