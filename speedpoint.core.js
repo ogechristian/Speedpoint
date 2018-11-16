@@ -1714,113 +1714,14 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
     });
 }
 
-/**
- * Same Parameters with SendSPEmail but the to array contains string of the login name instead of emails
- * Best to use for sharepoint on premise where emails can be changed and are unpredictable.
- * Send mails by login ensures mails are sent because login name will not change
- * @param {String} from the from address
- * @param {Array} to an array of login name the mail will be sent to 
- * @param {String} body the content of the email
- * @param {Array} [cc= []] the copy login name , an array of strings, these login name will be in copy
- * @param {String} subject the subject of the mail
- * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed. two arguments are passed to the call back
- * status: which tells you if the request is successful or failed and data: contains information about the mail sent
- * @param {String} [relative = "Currentpage url is used"] this parameter changes the location of the SP utility API
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //send mails to users in the to array, no users in copy (empty array passed)
- * var to = ["sptest"];
- * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",[], "subject",function(status, data){
- *      if(status === "success")
- *          console.log("mail sent");
- *      else
- *          console.log("mail failed");
- * });
- * 
- * //send mails to users in the to array and users are in copy
- * var to = ["sptest","sptest2"];
- * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",["sptest1","sptest2"], "subject",function(status, data){
- *      if(status === "success")
- *          console.log("mail sent");
- *      else
- *          console.log("mail failed");
- * });
-*/
-Speed.prototype.sendSPEmailByLogin = function(from, to, body, cc, subject,onSuccess,relative) {
-    //Get the relative url of the site
-    var urlToUSe = (typeof relative === 'undefined') ? true : relative;
-    var urlTemplate;
-    if(urlToUSe){
-        urlTemplate = _spPageContextInfo.webServerRelativeUrl;					        
-        urlTemplate = urlTemplate + "/_api/SP.Utilities.Utility.SendEmail";
-    }
-    else{
-        urlTemplate = "/_api/SP.Utilities.Utility.SendEmail";
-    }				        
-    
-	$.ajax({
-		contentType: 'application/json',
-		url: urlTemplate,
-		type: "POST",
-		data: JSON.stringify({
-				    'properties': {
-					       '__metadata': {
-					               'type': 'SP.Utilities.EmailProperties'
-					       },
-					       'From': from,
-					       'To': {
-					           'results': to
-					       },
-					       'CC' : {
-					           'results': cc
-					       },
-					       'Body': body,
-					       'Subject': subject,
-					       'AdditionalHeaders': {
-		                        '__metadata': {  
-		                            'type':'Collection(SP.KeyValue)'
-		                         },
-		                         'results':
-		                         [ 
-		                          {               
-		                            "__metadata": {
-		                            "type": 'SP.KeyValue'
-		                            },
-		                            "Key": "Content-Type",
-		                            "Value": 'text\\html',
-		                            "ValueType": "Edm.String"
-		                           }
-		                         ]
-	                      	}
-				    }
-        }),
-        headers: {
-				"Accept": "application/json;odata=verbose",
-				"content-type": "application/json;odata=verbose",
-				"X-RequestDigest": $("#__REQUESTDIGEST").val()
-        },
-        success: function (data) {
-				setTimeout(function () {
-                    onSuccess("success",data);
-                }, 1500)
-        },
-        error: function (err) {
-				setTimeout(function () {
-                    onSuccess("error",err);
-                }, 1500)
-        }
-    });
-}
-
 /* ============================== People Picker Section ============================*/
 /**
  * The initializePeoplePicker function initializes a people picker
  * @param {String} peoplePickerElementId this parameter specifices the div to be transform to a people picker
  * @param {String} properties this parameter specifices the properties of the people picker
- * @param {function} [setUpCall = function(){}] this parameter is the call back function thats called if you need to retrieve the people picker dictionary
+ * @param {callback} [setUpCall = function(SP.ClientPeopleDictionary){}] this parameter is the call back function thats called once the peoplepicker has been intialized,
+ * it returns a SP.ClientPeopleDictionary as an argument
  * object to set eventhandler or retrieve values
- * @returns {object} the sharepoint people picker dictionary object is passed to the setUpCall function as a parameter if the setup call is defined
  */
 Speed.prototype.initializePeoplePicker = function (peoplePickerElementId, properties, setUpCall) {
     var princpalAccount = 'User,DL,SecGroup,SPGroup';
@@ -1866,8 +1767,8 @@ Speed.prototype.initializePeoplePicker = function (peoplePickerElementId, proper
 /* ============================== People Picker Section ============================*/
 /**
  * The getUsersFromPicker function gets users from a people picker synchronously
- * @param {Object} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
- * @returns {object} a sharepoint user object manager
+ * @param {SP.ClientPeopleDictionary} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
+ * @returns {Array} returns an array of SP.User objects
  */
 Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
     //var people = this.SPClientPeoplePicker.SPClientPeoplePickerDict['relievee_TopSpan'];
@@ -1883,9 +1784,9 @@ Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
 
 /**
  * The getUsersFromPicker function gets users from a people picker Asynchronously
- * @param {Object} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
- * @param {function} onSuccess this parameter is the call back function thats called when the users details where retrieved successfully
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {SP.ClientPeopleDictionary} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
+ * @param {callback} onSuccess this parameter is the call back function thats called when the users details where retrieved successfully
+ * @param {callback} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} an array of sharepoint user objects
  */
@@ -1917,7 +1818,7 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
 
 /**
  * The setPeoplePickerValue function sets a user value for a people picker
- * @param {Object} peoplePickerObj this parameter provides the people picker dictionary object which the user will be set
+ * @param {SP.ClientPeopleDictionary} peoplePickerObj this parameter provides the people picker dictionary object which the user will be set
  * @param {String} userLogin this parameter provides the login of the user that will be set
  * 
  * @example
@@ -1934,7 +1835,7 @@ Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
 
 /**
  * The clearPicker function clears the value of a people picker
- * @param {Object} people this parameter provides the people picker dictionary object which is to be cleared
+ * @param {SP.ClientPeopleDictionary} people this parameter provides the people picker dictionary object which is to be cleared
  * @example
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
@@ -1955,10 +1856,18 @@ Speed.prototype.clearPicker = function (people) {
 /* ============================== User Section Section ============================*/
 /**
  * The currentUserDetails function gets current logged in user details
- * @param {callBack} callback this parameter is the call back function when the function is successful. an User object is passed as an argument to this called back
+ * @param {callBack} callback this parameter is the call back function when the function is successful. a SP.User object is passed as an argument to this callback
  * this argument can be used to retrieve details of the current user
- * @param {callBack} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
+ * speedCtx.getUserByLoginName(function(SPUserObject){
+ *      //here we are just getting the title of the current user
+ *      var userID = SPUserObject.get_title();
+ * });
  */
 Speed.prototype.currentUserDetails = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -1975,10 +1884,18 @@ Speed.prototype.currentUserDetails = function (callback, onFailed) {
 /**
  * The getUserById function gets a user by its ID
  * @param {int} usId the user ID
- * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callBack} callback this parameter is the call back function when the function is successful , the callback contains an SP.User object as an argumnet
+ * which contains the properties of the user
+ * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} a sharepoint user object
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
+ * speedCtx.getUserByLoginName(1, function(SPUserObject){
+ *      //here we are just getting the title of the retrieved user
+ *      var userID = SPUserObject.get_title();
+ * });
  */
 Speed.prototype.getUserById = function (usId, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -1989,7 +1906,12 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
     ctxt.load(ccbUser);
     ctxt.executeQueryAsync(function () {
         //set interval is used because userProperties might not be available is server resources is down
+        //set interval is used because userProperties might not be available is server resources is down
         var intervalCount = 0
+        window.speedGlobal.push(intervalCount);
+        var total = window.speedGlobal.length;
+        total--;
+        
         var intervalRef = setInterval(function () {
             try {
                 var userId = ccbUser.get_id();
@@ -1997,8 +1919,8 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
                 callback(ccbUser);
             }
             catch (e) {
-                intervalCount++;
-                if (intervalCount == 10) {
+                window.speedGlobal[total] = parseInt(window.speedGlobal[total]) + 1;
+                if (window.speedGlobal[total] == 10) {
                     clearInterval(intervalRef);
                     throw "User properties is not available check server resources";
                 }
@@ -2011,10 +1933,19 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
 /**
  * The getUserById function gets a user by its login
  * @param {string} loginName the user login name
- * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callBack} onSuccess this parameter is the call back function when the function is successful, the callback contains an SP.User object as an argumnet
+ * which contains the properties of the user
+ * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} a sharepoint user object
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
+ * speedCtx.getUserByLoginName("shris.com", function(SPUserObject){
+ *      //here we are just getting the title of the retrieved user
+ *      var userID = SPUserObject.get_title();
+ * });
  */
 Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2026,6 +1957,9 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
     context.executeQueryAsync(function () {
         //set interval is used because userProperties might not be available is server resources is down
         var intervalCount = 0
+        window.speedGlobal.push(intervalCount);
+        var total = window.speedGlobal.length;
+        total--;
         var intervalRef = setInterval(function () {
             try {
                 var userId = userObject.get_id();
@@ -2033,13 +1967,12 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
                 onSuccess(userObject);
             }
             catch (e) {
-                intervalCount++;
-                if (intervalCount == 10) {
+                window.speedGlobal[total] = parseInt(window.speedGlobal[total]) + 1;
+                if (window.speedGlobal[total] == 10) {
                     clearInterval(intervalRef);
                     throw "User properties is not available check server resources";
                 }
             }
-
         }, 1000);
     },Function.createDelegate(this, onFailedCall));
 }
@@ -2226,7 +2159,7 @@ Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
  * @param {function} callback this parameter is the call back function when the function is successful
  * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {array} an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
+ * @returns {array} an array of enumeration of the userCollection object.
  */
 Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2248,17 +2181,7 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
                    //load users of the group
                    context.load(window.speedGlobal[total]);
                    context.executeQueryAsync(function () {
-                       var userEnumerator = window.speedGlobal[total].getEnumerator();
-                       while (userEnumerator.moveNext()) {
-                           var prop = {};
-                           var oUser = userEnumerator.get_current();
-                           prop.title = oUser.get_title();
-                           prop.id = oUser.get_id();
-                           prop.email = oUser.get_email();
-                           prop.logon = oUser.get_loginName();
-                           users.push(prop);
-                       }
-                       callback(users);
+                        callback(window.speedGlobal[total]);  
                    }, Function.createDelegate(this, onFailedCall));
                }
            }
@@ -2840,7 +2763,7 @@ Speed.prototype.DataForTable = {
             var tableControls = settings.context.getControls(true);
             for (previousItem; previousItem < nextPageItem; previousItem++) {
                 if (settings.modifyTR) {
-                    str += SpeedContext.DataForTable.trExpression(previousItem);
+                    str += settings.context.DataForTable.trExpression(previousItem);
                 }
                 else {
                     str += "<tr>";
