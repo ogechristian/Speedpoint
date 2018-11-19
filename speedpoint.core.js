@@ -720,8 +720,8 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
 /**
  * The createList function creates a list in the context used
  * @param {object} listProperties this parameter contains all the properties required for the creation of a sharepoint list
- * @param {function} onSuccess this parameter is the call back function thats called when the list has successfully been created
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the list fails to create, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the list has successfully been created
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the list fails to create, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
@@ -801,8 +801,8 @@ Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appC
  * The createColumnInList function creates columns for a specified list in the context used
  * @param {array} arr this parameter contains an array of column property objects used for the creation of the column in a specified list
  * @param {String} listName this parameter specifices the list which the columns are to be created
- * @param {function} onSuccess this parameter is the call back function thats called when the column has successfully been created
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the list fails to create, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the column has successfully been created
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the list fails to create, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
@@ -837,10 +837,29 @@ Speed.prototype.createColumnInList = function (arr, listName, onSuccess, onFaile
  * @param {array} arr this parameter contains an array of key-values property objects used for the updating of the row in a specified list by the Id
  * this means Id must be part of the key-value properties to be Passed. key values must match the Columns in the list
  * @param {String} listName this parameter specifices the list which the rows are to be updated
- * @param {function} onSuccess this parameter is the call back function thats called when the row has successfully been updated
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the row fails to update, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the row has successfully been updated
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to update, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //create an object where the property name is the same as the Column name in the list you want to update
+ * //in this case i have a column Title i want to update 
+ * var objectToUpdate = {};
+ * objectToUpdate.Title = "Testing";
+ * //after that i have to set the ID of the item i want to update, in this example the ID is 2. without the ID the items wont update
+ * objectToUpdate.ID = 2;
+ * //then pass the object to an array, we are only passing this object so only the object is updated, if you have multiple items,
+ * then add them to the array 
+ * var ListItems = [];
+ * ListItems.push(objectToUpdate);
+ * //then i call the speed update function
+ * speedctx.updateItems(ListItems, "Leave",function(){
+ *      console.log("I succeeded in updating .....");
+ * });
+ * 
+ * //for cross domain example please reference the docs..............
  */
 Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -874,11 +893,35 @@ Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appC
  * @param {array} arr this parameter contains an array of key-values property objects used for the creation of the row in a specified list. key values must
  *  match the Columns in the list
  * @param {String} listName this parameter specifices the list which the rows are to be created
- * @param {function} onSuccess this parameter is the call back function thats called when the row has successfully been created
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the row fails to create, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the row has successfully been created. ListItem information 
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to create, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} the sharepoint list item creation object. this object is passed to the onSuccess function parameter and can be used from there
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //create an object where the property name is the same as the Column name in the list you want to create the item in
+ * //in this case i have a column Title and EmployeeName i want to set the value for 
+ * var objectToUpdate = {};
+ * objectToCreate.Title = "Testing";
+ * objectToCreate.EmployeeName = "Jacob Blast";
+ * //then pass the object to an array, we are only passing this object so only the object is created, if you have multiple items,
+ * then add them to the array, all will be created.
+ * var ListItems = [];
+ * ListItems.push(objectToCreate);
+ * //then i call the speed create function
+ * speedctx.createItems(ListItems, "Leave",function(itemProperties){
+ *      for(var x = 0; x <= (itemProperties.length - 1); x++){
+ *          //log all IDs for the newly created items
+ *          console.log(itemProperties[x].get_id());
+ *      }
+ *      console.log("I succeeded in creating the items .....");
+ * });
+ * 
+ * //the itemProperties Array returned contains an array of SP.Item Objects which contains details about the object, in this case we are retrieving the id 
+ * //of the created objects respectively, if 10 items are in the array, 10 SP.items objects will be contained in the array returned
+ * 
+ * //for cross domain example please reference the docs..............
  */
 Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -918,10 +961,18 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
  * The createItems function creates rows for a specified list in the context used
  * @param {String} listname this parameter specifices the list which the row is to be deleted
  * @param {Int} id this parameter specifices the id of the row which is to be deleted
- * @param {function} onSuccess this parameter is the call back function thats called when the row has successfully been deleted
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the row fails to deleted, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the row has successfully been deleted
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to deleted, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //then i call the speed delete function and pass in the ID of the Item in the right parameter
+ * speedctx.deleteItem("Leave",1,function(){
+ *      console.log("deleting the item .....");
+ * });
+ * //for cross domain example please reference the docs..............
  */
 Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -946,12 +997,26 @@ Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appCon
  * The getItem function retrieve rows for a specified list in the context used
  * @param {String} listName this parameter specifices the list which the rows are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
- * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved, SP.Item object is returned as
+ * an argument to the callback function
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
- * from there
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //then i call the speed getItem function with all the parameters
+ * speedctx.getItem("Leave","<Caml Query string>",function(items){
+ *      // an enumerator of items returned based on the query passed
+ *      var listEnumerator = items.getEnumerator();
+ *      while (listEnumerator.moveNext()) {
+ *          //retrieves the value of the Title Column for the current item
+ *          var title = listEnumerator.get_current().get_item('Title');
+ *      }
+ * });
+ * 
+ * //for cross domain example please reference the docs..............
  */
 Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -981,12 +1046,10 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
- * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback()} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
- * from there
  */
 Speed.prototype.getListToControl = function (SpeedContext, listName, caml, controls, onSuccess, onFailed, appContext) {
     var controlArray = this.getControls();
@@ -1064,12 +1127,10 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
  * @param {function} conditions this parameter includes special conditions for each object properties, condition must return an object 
- * @param {function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} the sharepoint list item object which can enumerated. this object is passed to the onSuccess function parameter and can be used
- * from there
  */
 Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls, tableonly, conditions, onSuccess, onFailed, appContext) {
     var controlArray = this.getControls(tableonly);
@@ -1719,7 +1780,7 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
  * The initializePeoplePicker function initializes a people picker
  * @param {String} peoplePickerElementId this parameter specifices the div to be transform to a people picker
  * @param {String} properties this parameter specifices the properties of the people picker
- * @param {callback} [setUpCall = function(SP.ClientPeopleDictionary){}] this parameter is the call back function thats called once the peoplepicker has been intialized,
+ * @param {callback(SP.ClientPeopleDictionary)} setUpCall this parameter is the call back function thats called once the peoplepicker has been intialized,
  * it returns a SP.ClientPeopleDictionary as an argument
  * object to set eventhandler or retrieve values
  */
@@ -1785,10 +1846,10 @@ Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
 /**
  * The getUsersFromPicker function gets users from a people picker Asynchronously
  * @param {SP.ClientPeopleDictionary} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
- * @param {callback} onSuccess this parameter is the call back function thats called when the users details where retrieved successfully
- * @param {callback} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback([SP.Users])} onSuccess this parameter is the call back function thats called when the users details where retrieved successfully
+ * and array of users is returned as an argument in the callback
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {array} an array of sharepoint user objects
  */
 Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSuccess, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -1856,9 +1917,9 @@ Speed.prototype.clearPicker = function (people) {
 /* ============================== User Section Section ============================*/
 /**
  * The currentUserDetails function gets current logged in user details
- * @param {callBack} callback this parameter is the call back function when the function is successful. a SP.User object is passed as an argument to this callback
+ * @param {callBack(SP.User)} callback this parameter is the call back function when the function is successful. a SP.User object is passed as an argument to this callback
  * this argument can be used to retrieve details of the current user
- * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @example
  * // returns a normal context related to the current site
@@ -1884,9 +1945,9 @@ Speed.prototype.currentUserDetails = function (callback, onFailed) {
 /**
  * The getUserById function gets a user by its ID
  * @param {int} usId the user ID
- * @param {callBack} callback this parameter is the call back function when the function is successful , the callback contains an SP.User object as an argumnet
+ * @param {callBack(SP.User)} callback this parameter is the call back function when the function is successful , the callback contains an SP.User object as an argumnet
  * which contains the properties of the user
- * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @example
  * // returns a normal context related to the current site
@@ -1933,9 +1994,9 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
 /**
  * The getUserById function gets a user by its login
  * @param {string} loginName the user login name
- * @param {callBack} onSuccess this parameter is the call back function when the function is successful, the callback contains an SP.User object as an argumnet
+ * @param {callBack(SP.User)} onSuccess this parameter is the call back function when the function is successful, the callback contains an SP.User object as an argumnet
  * which contains the properties of the user
- * @param {callBack} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * 
  * @example
@@ -1979,10 +2040,9 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
 
 /**
  * The getCurrentUserProperties function gets the current user UserProfile Properties
- * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(SP.UserProfileProperties)} callback this parameter is the call back function when the function is successful
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} a sharepoint user UserProfile Properties
  */
 Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2002,9 +2062,8 @@ Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
  * @param {String} acctname the login of the user which you want to obtain its properties
  * @param {array} profilePropertyNames an array of strings containing the properties you want to retrieve
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} a sharepoint user UserProfile Properties
  */
 Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyNames, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2035,7 +2094,7 @@ Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyN
  * @param {String} description the brief description of the list
  * @param {object} properties the group properties object
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  */
 Speed.prototype.createSPGroup = function (title, description, properties, callback, onFailed) {
@@ -2097,7 +2156,7 @@ Speed.prototype.createSPGroup = function (title, description, properties, callba
  * The retrieveAllUsersInGroup function gets all users in a sharepoint group
  * @param {String} group the group which users will be retrieved from
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
  */
@@ -2131,7 +2190,7 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
  * The allUsersInGroup function gets all users in a sharepoint group
  * @param {String} group the group which users will be retrieved from
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} a sharepoint userCollection object (more info about this user is present in this object)
  */
@@ -2157,7 +2216,7 @@ Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
  * The allUsersInGroup2010 function gets all users in a sharepoint group. this function works for sharepoint 2010 but its not an optimized option.
  * @param {String} group the group which users will be retrieved from
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} an array of enumeration of the userCollection object.
  */
@@ -2192,7 +2251,7 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
  * The retrieveMultipleGroupUsers function gets all users in different sharepoint group. this function works for sharepoint 2010 but its not an optimized option.
  * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
  */
@@ -2341,7 +2400,7 @@ Speed.prototype.convertDataURIToBinary = function (dataURI) {
  * @param {String} foldername the name of the folder that should be created
  * @param {String} library the title of the library which the folder will be created
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {object} sharepoint folder object returned
  */
@@ -2372,7 +2431,7 @@ Speed.prototype.createFolder = function (foldername, library, onSuccess, onFaile
  * @param {String} foldername the name of the folder that should be created
  * @param {String} library the title of the library which the folder will be created
  * @param {function} callback this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  * @returns {object} sharepoint folder object returned
@@ -2405,7 +2464,7 @@ Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed
  * @param {String} folder the folder where the file will be uploaded
  * @param {String} filetype the filetype of the file, null should passed if file is not txt
  * @param {function} onSuccess this parameter is the call back function when the function is successful
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  * @returns {object} sharepoint file object returned
@@ -2450,7 +2509,7 @@ Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, filetype,
  * @param {String} fileCount the index of the file object to start in the array
  * @param {function} feedBack the feedback function is called after each file has been uploaded successfully
  * @param {function} onSuccess this parameter is the call back function when all the files have been uploaded successfully
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  * @returns {object} percentage upload (Int) as the first parameter, sharepoint file object returned as a second parameter
@@ -2521,7 +2580,7 @@ Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed) {
  * @param {String} libraryUrl the library url where the files will be uploaded to 
  * @param {int} logLimit the log file size limit before another log is created
  * @param {function} callback this parameter is the call back function when the logis successfully written to the document library
- * @param {function} [onFailed = function(){}] this parameter is the call back function thats called when the function fails, by default
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  * @returns {object} percentage upload (Int) as the first parameter, sharepoint file object returned as a second parameter
@@ -2646,7 +2705,7 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
  * @param {Function} conditions this parameter includes special conditions for each object properties, condition must return an object
  * @param {Function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
- * @param {function} [onFailed = function] this parameter is the call back function thats called when the function fails, by default onQueryFailed is called when all sharepoint async calls fail
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = Object] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
 Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
