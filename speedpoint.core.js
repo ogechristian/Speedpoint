@@ -111,12 +111,13 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
     }
 
     function workflowScripts() {
-        if (properties.userProfile) {
-            SP.SOD.executeFunc("sp.js", 'SP.ClientContext', function () {
-                $.getScript(scriptbase + "SP.UserProfiles.js");
-                SP.SOD.executeOrDelayUntilScriptLoaded(callBack, 'SP.UserProfiles.js');
-            });
-            
+        if (typeof properties.userProfile !== "undefined") {
+            if (properties.userProfile) {
+                SP.SOD.executeFunc("sp.js", 'SP.ClientContext', function () {
+                    $.getScript(scriptbase + "SP.UserProfiles.js");
+                    SP.SOD.executeOrDelayUntilScriptLoaded(callBack, 'SP.UserProfiles.js');
+                });
+            }
         }
         else
             SP.SOD.executeFunc("sp.js", 'SP.ClientContext', callBack);
