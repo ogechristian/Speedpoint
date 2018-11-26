@@ -548,7 +548,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
 
 /**
  * The getControls function gets all speed-bind & speed-bind-validate html attributes names
-  * @returns {Array} the Array return contains all controls names
+ * @returns {Array} the Array return contains all controls names
  */
 Speed.prototype.getControls = function (onlyTables) {
     var pickOnlyTable = (typeof onlyTable === "undefined") ? false : onlyTables
@@ -635,7 +635,6 @@ Speed.prototype.htmlBind = function (listObjects) {
     }
 }
 
-
 //================= work in progress ============
 Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tableProperties) {
     for (var key in listObjects) {
@@ -662,7 +661,7 @@ Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tab
 
 /**
  * The applyValidationEvents function activates the event handlers for the html elements with the speed-bind-validate attribute
- * @param {object} speedPointContext this parameter is the speedpoint context
+ * @param {SP.Context} speedPointContext this parameter is the speedpoint context
  */
 Speed.prototype.applyValidationEvents = function (speedPointContext) {
     //Speed bind and validate html
@@ -723,7 +722,7 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
  * @param {callback} onSuccess this parameter is the call back function thats called when the list has successfully been created
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the list fails to create, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
 Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
@@ -997,7 +996,7 @@ Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appCon
  * The getItem function retrieve rows for a specified list in the context used
  * @param {String} listName this parameter specifices the list which the rows are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
- * @param {callback} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved, SP.Item object is returned as
+ * @param {callback(enumerator)} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved, SP.Item object is returned as
  * an argument to the callback function
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
@@ -1046,7 +1045,8 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
- * @param {callback()} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * @param {callback(Object)} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * object is List Column  as key ,and data of the column is the data in the list
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
@@ -1778,6 +1778,7 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
 /* ============================== People Picker Section ============================*/
 /**
  * The initializePeoplePicker function initializes a people picker
+ * @import SP.clientpeoplepicker.js is required
  * @param {String} peoplePickerElementId this parameter specifices the div to be transform to a people picker
  * @param {String} properties this parameter specifices the properties of the people picker
  * @param {callback(SP.ClientPeopleDictionary)} setUpCall this parameter is the call back function thats called once the peoplepicker has been intialized,
@@ -1828,6 +1829,7 @@ Speed.prototype.initializePeoplePicker = function (peoplePickerElementId, proper
 /* ============================== People Picker Section ============================*/
 /**
  * The getUsersFromPicker function gets users from a people picker synchronously
+ * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
  * @returns {Array} returns an array of SP.User objects
  */
@@ -1845,6 +1847,7 @@ Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
 
 /**
  * The getUsersFromPicker function gets users from a people picker Asynchronously
+ * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} peoplePickerControl this parameter provides the people picker dictionary object to retrieve the users from
  * @param {callback([SP.Users])} onSuccess this parameter is the call back function thats called when the users details where retrieved successfully
  * and array of users is returned as an argument in the callback
@@ -1879,6 +1882,7 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
 
 /**
  * The setPeoplePickerValue function sets a user value for a people picker
+ * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} peoplePickerObj this parameter provides the people picker dictionary object which the user will be set
  * @param {String} userLogin this parameter provides the login of the user that will be set
  * 
@@ -1896,6 +1900,7 @@ Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
 
 /**
  * The clearPicker function clears the value of a people picker
+ * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} people this parameter provides the people picker dictionary object which is to be cleared
  * @example
  * // returns a normal context related to the current site
@@ -2040,9 +2045,19 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
 
 /**
  * The getCurrentUserProperties function gets the current user UserProfile Properties
- * @param {callback(SP.UserProfileProperties)} callback this parameter is the call back function when the function is successful
+ * @import SP.UserProfiles.js is required
+ * @param {callback(SP.UserProfileProperties)} callback this parameter is the call back function when the function is successful, 
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument SPUserProperties is the SP.UserProperties object return from the callback, you can give it any name it will still represent the same SPUserProperties object.
+ * this property contains all the information of the current user in relation to the UserProperties column
+ * speedCtx.getCurrentUserProperties(function(SPUserProperties){
+ *      //here we are just getting the department of the retrieved user
+ *      var department = SPUserProperties.get_userProfileProperties()['Department'];
+ * });
  */
 Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2052,7 +2067,7 @@ Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
     clientContext.load(userProfileProperties);
     clientContext.executeQueryAsync(function () {
         setTimeout(function () {
-            callback(userProfileProperties)
+            callback(userProfileProperties);
         }, 1000);
     }, Function.createDelegate(this, onFailedCall));
 };
@@ -2061,9 +2076,19 @@ Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
  * The getSpecificUserProperties function gets a user UserProfile Properties by login name
  * @param {String} acctname the login of the user which you want to obtain its properties
  * @param {array} profilePropertyNames an array of strings containing the properties you want to retrieve
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {callback(Array)} callback this parameter is the call back function when the function is successful, it returns and array of values
+ * in respect to the properties retrieved.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument SPUserProperties is the value of the sp user properties specified
+ * speedCtx.getSpecificUserProperties("s.jacob@test.com",["SPS-JobTitle","Department"],function(SPUserProperties){
+ *      //here we are just getting the jobtitle and department of the retrieved user
+ *      var jobtitle = SPUserProperties[0];
+ *      var department = SPUserProperties[1];
+ * });
  */
 Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyNames, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2155,10 +2180,21 @@ Speed.prototype.createSPGroup = function (title, description, properties, callba
 /**
  * The retrieveAllUsersInGroup function gets all users in a sharepoint group
  * @param {String} group the group which users will be retrieved from
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {callback(Array)} callback this parameter is the call back function when the function is successful,an array of object with properties title,id,email,login. 
+ * the enumeration of the userCollection object has taken care of.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {array} an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument userArray in the callback contains the following properties:  title,id,email,login
+ * speedCtx.retrieveAllUsersInGroup("HR Admin",function(userArray){
+ *      //here we are just getting the jobtitle and department of the retrieved user
+ *      for(var x = 0; x <= (userArray.length - 1); x++){
+ *          var username = userArray[x].title;
+ *      }
+ * });
  */
 Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2178,7 +2214,7 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
             prop.title = oUser.get_title();
             prop.id = oUser.get_id();
             prop.email = oUser.get_email();
-            prop.logon = oUser.get_loginName();
+            prop.login = oUser.get_loginName();
             users.push(prop);
         }
         callback(users);
@@ -2189,7 +2225,7 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
 /**
  * The allUsersInGroup function gets all users in a sharepoint group
  * @param {String} group the group which users will be retrieved from
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {callback(enumerator)} callback this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {array} a sharepoint userCollection object (more info about this user is present in this object)
@@ -2250,10 +2286,21 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
 /**
  * The retrieveMultipleGroupUsers function gets all users in different sharepoint group. this function works for sharepoint 2010 but its not an optimized option.
  * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {callback(Array)} callback this parameter is the call back function when the function is successful
+ * an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {array} an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * the argument userArray in the callback contains the following properties:  title,id,email,login
+ * speedCtx.retrieveMultipleGroupUsers("HR Admin;Legal",function(userArray){
+ *      //here we are just getting the jobtitle and department of the retrieved user
+ *      for(var x = 0; x <= (userArray.length - 1); x++){
+ *          var username = userArray[x].title;
+ *      }
+ * });
  */
 Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2284,7 +2331,7 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
                         prop.title = oUser.get_title();
                         prop.id = oUser.get_id();
                         prop.email = oUser.get_email();
-                        prop.logon = oUser.get_loginName();
+                        prop.login = oUser.get_loginName();
                         var userExist = false
                         for (var y = 0; y <= (users.length - 1) ; y++) {
                             if (users[y].logon == prop.logon) {
@@ -2311,22 +2358,47 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
         callback(users);
     }
 }
-//---------Checks if user is a member of a group---------------
+
+/**
+ * The isUserMemberOfGroup function checks if a user belongs to a set of groups (";") seperated. it also returns all users in different sharepoint group. 
+ * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
+ * @param {object} userDetails this object contains properties that will be used for check only one of the following properties are needed
+ * (id,email,login ) for the check while the returnCollection property (type bool) indicates if the users should be returned as the second argument, if false an empty object is returned
+ * @param {callback(boolean,Object)} callback this parameter is the call back function when the function is successful.The following arguments are returned
+ * Boolean value ,true means user belongs to the group collection, false means user doesnt belong to the group collection 
+ * an object contains array of users in each group in the group collection, the Array contains properties title,id,email,login. the enumeration of the userCollection object has taken care of.
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * isUser is a boolean
+ * the argument userArray in the callback contains the following properties:  title,id,email,login
+ * speedCtx.isUserMemberOfGroup("HR Admin;Legal",{id : 24 , returnCollection : true},function(isUser,userArray){
+ *      for(var x = 0; x <= (userArray["HR Admin].length - 1); x++){
+ *          var username = userArray["HR Admin][x].title;
+ *      }
+ * });
+ */
 Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var returnUsers = (typeof userDetails.returnCollection === "undefined") ? false : userDetails.returnCollection;
     var boolVal = false;
     var globalContextCount = [];
+    var usersArray = {};
     if (typeof groupCollection !== 'undefined') {
         var groupFound = 0;
         var groupsAvail = false;
         var groupNames = groupCollection.split(";");
+        var clientContext = this.initiate();
+        var collGroup = clientContext.get_web().get_siteGroups();
         for (var i = 0; i <= (groupNames.length - 1); i++) {
             if (boolVal) {
                 break;
             }
+            usersArray[groupNames[i]] = [];
             groupsAvail = true;
-            var clientContext = this.initiate();
-            var collGroup = clientContext.get_web().get_siteGroups();
             var oGroup = collGroup.getByName(groupNames[i]);
             window.speedGlobal.push(oGroup.get_users());
             var total = window.speedGlobal.length;
@@ -2348,31 +2420,38 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
                         if (typeof userDetails.login !== "undefined") {
                             if (prop.login === userDetails.login) {
                                 boolVal = true;
-                                break;
+                                if(!returnUsers)
+                                    break;
                             }
                         }
                         else if (typeof userDetails.id !== "undefined") {
                             if (prop.id === userDetails.id) {
                                 boolVal = true;
-                                break;
+                                if(!returnUsers)
+                                    break;
                             }
                         }
                         else if (typeof userDetails.email !== "undefined") {
                             if (prop.email === userDetails.email) {
                                 boolVal = true;
-                                break;
+                                if(!returnUsers)
+                                    break;
                             }
+                        }
+
+                        if(returnUsers){
+                            usersArray[groupNames[i]].push(prop);
                         }
                     }
                     if (groupFound == groupNames.length || boolVal)
-                        callback(boolVal);
+                        callback(boolVal,usersArray);
                 }, 1500);
             }
                 , Function.createDelegate(this, onFailedCall));
         }
         //callback called if no group was foud
         if (groupFound == 0 && !groupsAvail) {
-            callback(boolVal);
+            callback(boolVal,usersArray);
         }
     }
     else {
@@ -2380,7 +2459,11 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
     }
 }
 /* ============================== Document Library Section ============================*/
-//----converts data URI to Base 64------//
+/**
+ * The convertDataURIToBinary function converts DataURI to Base64 byte
+ * @param {string} dataURI this parameter provides datauri string
+ * @returns {Array} returns an array of type base 64
+ */
 Speed.prototype.convertDataURIToBinary = function (dataURI) {
     var BASE64_MARKER = ';base64,';
     var base64Index = dataURI.indexOf(BASE64_MARKER) + BASE64_MARKER.length;
@@ -2399,7 +2482,7 @@ Speed.prototype.convertDataURIToBinary = function (dataURI) {
  * The createFolder function creates a folder in a document library
  * @param {String} foldername the name of the folder that should be created
  * @param {String} library the title of the library which the folder will be created
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {callback(folderCollection)} callback this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @returns {object} sharepoint folder object returned
@@ -2428,13 +2511,11 @@ Speed.prototype.createFolder = function (foldername, library, onSuccess, onFaile
 
 /**
  * The deleteFolderOrFile function deletes folder from Libary
- * @param {String} foldername the name of the folder that should be created
- * @param {String} library the title of the library which the folder will be created
- * @param {function} callback this parameter is the call back function when the function is successful
+ * @param {String} folderDocUrl the url of the folder or file that needs to be deleted
+ * @param {callback} callback this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} sharepoint folder object returned
  */
 Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
@@ -2579,7 +2660,7 @@ Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed) {
  * @param {string} library the library where the log file will be saved
  * @param {String} libraryUrl the library url where the files will be uploaded to 
  * @param {int} logLimit the log file size limit before another log is created
- * @param {function} callback this parameter is the call back function when the logis successfully written to the document library
+ * @param {callback} callback this parameter is the call back function when the logis successfully written to the document library
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
@@ -2615,7 +2696,12 @@ Speed.prototype.logWriter = function (speedContext, fileName, logContent, librar
 }
 
 /* ============================== Debugging Section  ============================*/
-//--------when any query fails this method is called -----------
+/**
+ * The onQueryFailed function is the async function for all sharepoint related methods when those methods fail,
+ * this method can be overridden when calling sharepoint methods by passing the name of your custom function in the onFailed parameter
+ * @param {object} sender 
+ * @param {object} args this object contains information about the error
+ */
 Speed.prototype.onQueryFailed = function(sender, args){
         var error = {};
         error.msg = args.get_message();
