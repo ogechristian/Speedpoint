@@ -682,7 +682,7 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
                         msg: validationMessage,
                         extension: validationtype,
                         addErrors: false,
-                        styleElement: false,
+                        styleElement: true,
                         removeHtmlErrors: true,
                         triggerCallback: function (id, msg) {
                             $("#" + id).siblings(".temp-speedmsg").remove();
@@ -703,7 +703,7 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
                         msg: validationMessage,
                         extension: validationtype,
                         addErrors: false,
-                        styleElement: false,
+                        styleElement: true,
                         removeHtmlErrors: true,
                         triggerCallback: function (id, msg) {
                             $("#" + id).siblings(".temp-speedmsg").remove();
@@ -1692,6 +1692,52 @@ Speed.prototype.JSONToObject = function (val, stringType) {
             returnObj = {};
     }
     return returnObj;
+}
+
+/**
+ * The dataUriFormImageSrc function returns the dataUri of an file from its file path
+ * @param {array} url this parameter is the url of the file on the server or solution
+ * @param {callback(datauri)} onSuccess this parameter is the call back function thats called when the file is successfully retrieved
+ * the datauri is returned as an argument in the success callback 
+ * @param {callback(sender)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the file fails to be retrieved
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * //
+ * speedCtx.dataUriFormImageSrc('static/images/logo.jpg', function (dataUri) {
+ *      console.log(dataUri);
+ * });
+ */
+Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    //get file extension
+    var fileNameSplit = url.split(".");
+    var fileExt = fileNameSplit.pop();
+    var xmlHTTP = new XMLHttpRequest();
+    xmlHTTP.open('GET', url, true);
+    xmlHTTP.responseType = 'arraybuffer';
+    xmlHTTP.onload = function (e) {
+        if (this.status === 200) {
+            var arr = new Uint8Array(this.response);
+            var raw = String.fromCharCode.apply(null, arr);
+            var b64 = btoa(raw);
+            if (fileExt.toLowerCase() == 'png')
+                var dataURL = "data:image/png;base64," + b64;
+            else if (fileExt.toLowerCase() == 'jpg' || fileExt.toLowerCase() == 'jpeg')
+                var dataURL = "data:image/jpeg;base64," + b64;
+            callBack(dataURL);
+        }
+        else {
+            var speedError = {};
+            speedError.errorObject = this;
+            if (this.responseType === "text" || this.responseType === "")
+                speedError.msg = "status : " + this.status + " , " + this.responseText;
+            else
+                speedError.msg = "status : " + this.status;
+            onFailedCall(speedError)
+        }
+    };
+    xmlHTTP.send();
 }
 
 /*============================= Email Section =========================*/
@@ -2703,11 +2749,13 @@ Speed.prototype.logWriter = function (speedContext, fileName, logContent, librar
  * @param {object} sender 
  * @param {object} args this object contains information about the error
  */
-Speed.prototype.onQueryFailed = function(sender, args){
-        var error = {};
-        error.msg = args.get_message();
-        error.trace = args.get_stackTrace();
+Speed.prototype.onQueryFailed = function (sender, args) {
+    try {
         console.log('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
+    }
+    catch (e) {
+        console.log('Request failed. ' + sender.msg);
+    }
 }
 
 //work in progress
