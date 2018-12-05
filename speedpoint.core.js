@@ -1967,8 +1967,35 @@ Speed.prototype.clearPicker = function (people) {
 
 //==================================================================================================
 /* ============================== User Section Section ============================*/
+
 /**
- * The currentUserDetails function gets current logged in user details
+ * The currentUserDetails function gets current logged in user details synchronously
+ * @returns {Object} returns an object with the following properties: id,fullLogin,login,isAdmin,email,title
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * var userProperties = speedCtx.currentUserDetails();
+ */
+Speed.prototype.currentUserDetails = function () {
+    var CurrentUserProperties = {};
+    CurrentUserProperties.id = _spPageContextInfo.userId;
+    CurrentUserProperties.fullLogin = _spPageContextInfo.userLoginName;
+    CurrentUserProperties.login = _spPageContextInfo.userLoginName.SPLoginFromFullLogin();
+    CurrentUserProperties.isAdmin = _spPageContextInfo.isSiteAdmin;
+    try{
+        //this block will work for o365
+        CurrentUserProperties.email = _spPageContextInfo.userEmail;
+        CurrentUserProperties.title = _spPageContextInfo.userDisplayName;
+    }
+    catch(e){
+        //this block will parse is its onPremise
+        CurrentUserProperties.email = null;
+        CurrentUserProperties.title = null;
+    }
+};
+
+/**
+ * The currentUserDetailsAsync function gets current logged in user details Asynchronously
  * @param {callBack(SP.User)} callback this parameter is the call back function when the function is successful. a SP.User object is passed as an argument to this callback
  * this argument can be used to retrieve details of the current user
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
@@ -1977,12 +2004,13 @@ Speed.prototype.clearPicker = function (people) {
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
  * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
- * speedCtx.getUserByLoginName(function(SPUserObject){
+ * speedCtx.currentUserDetailsAsync(function(SPUserObject){
  *      //here we are just getting the title of the current user
  *      var userID = SPUserObject.get_title();
  * });
  */
-Speed.prototype.currentUserDetails = function (callback, onFailed) {
+
+Speed.prototype.currentUserDetailsAsync = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
     var speedContextMaster = this.initiate();
     var speedUserMaster = speedContextMaster.get_web().get_currentUser();
@@ -2005,7 +2033,7 @@ Speed.prototype.currentUserDetails = function (callback, onFailed) {
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
  * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
- * speedCtx.getUserByLoginName(1, function(SPUserObject){
+ * speedCtx.getUserById(1, function(SPUserObject){
  *      //here we are just getting the title of the retrieved user
  *      var userID = SPUserObject.get_title();
  * });
