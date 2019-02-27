@@ -30,6 +30,8 @@ function Speed(cxt, bolval) {
     this.dynamicVariable = 'speed';
     this.url = cxt;
     this.optional = (typeof bolval === 'undefined') ? false : bolval;
+    this.errorHandler = this.onQueryFailed;
+    this.tempCallbacks = {};
     if (typeof window.speedGlobal === 'undefined')
         window.speedGlobal = [];
     if (!this.checkScriptDuplicates('jquery'))
@@ -123,7 +125,6 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
             SP.SOD.executeFunc("sp.js", 'SP.ClientContext', callBack);
     }
 }
-
 
 /* ============================== Caml Builder Section ============================*/
 /**
@@ -407,8 +408,9 @@ Speed.prototype.styleValidatedClass = function (mystyle) {
         if (typeof mystyle === 'undefined')
             $("head").append(styleDefinition);
         else {
-            //-----work on this later -------
-            $("head").append("<style>.speedhtmlerr" + mystyle + "</style>");
+            //----- work on this later -------
+            var customStyles = "<style>.speedhtmlerr" + mystyle + " p.temp-speedmsg {color:red !important; font-weight:bold; margin:0}</style>";
+            $("head").append(customStyles);
         }
         this.stylePlace = true;
     }
@@ -440,7 +442,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
     var bindStaticFields = (typeof staticBind === 'undefined') ? true : staticBind;
     var returnObject = {}
     if (typeof listObjects !== "undefined" && listObjects != null) {
-        returnObject = listObjects
+        returnObject = listObjects;
     }
     //decides if u want to bind static fields to objects
     //set this option to false if the static fields already contains the same values with the object
@@ -485,7 +487,11 @@ Speed.prototype.bind = function (listObjects, staticBind) {
     for (var i = 0; i <= (elementPeople.length - 1); i++) {
         var property = elementPeople[i].getAttribute("speed-bind-people");
         var msg = elementPeople[i].getAttribute("speed-validate-msg");
-        var useJson = (elementPeople[i].getAttribute("speed-people-JSON") == "Yes") ? true : false;
+
+        var useJson = (elementPeople[i].getAttribute("speed-people-JSON") !== null) ? (elementPeople[i].getAttribute("speed-people-JSON").toLowerCase() === "true") : false;
+
+        var validate = (elementPeople[i].getAttribute("speed-people-validate") !== null) ? (elementPeople[i].getAttribute("speed-people-validate").toLowerCase() === "true") : false;
+
         var inputid = elementPeople[i].getAttribute("id");
         var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
         var validationtype = "text";
@@ -494,12 +500,37 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             var peopleDict = SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID];
 
             var userObject = this.getUsersFromPicker(peopleDict);
-            if (userObject.length !== 0) {
-                if (useJson)
-                    returnObject[property] = userObject;
+            if (userObject !== null) {
+                if (userObject.length !== 0) {
+                    if (useJson) {
+                        returnObject[property] = userObject;
+                    }
+                    else {
+                        if (userObject.length == 1)
+                            returnObject[property] = SP.FieldUserValue.fromUser(userObject[0].Key);
+                        else {
+                            if (peopleDict.AllowMultipleUsers) {
+                                var tempArray = [];
+                                for (var a = 0; a <= (userObject.length -1); a++) {
+                                    tempArray.push(SP.FieldUserValue.fromUser(userObject[a].Key));
+                                }
+                                returnObject[property] = tempArray;
+                            }
+                            else {
+                                returnObject[property] = null;
+                                if (validate)
+                                    this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+                            }
+                        }
+                    }
+                }
+                else {
+                    returnObject[property] = null;
+                    if (validate)
+                        this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+                }
             }
-            else
-                this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+               
         }
     }
 
@@ -507,7 +538,7 @@ Speed.prototype.bind = function (listObjects, staticBind) {
     var elementValidate = document.querySelectorAll("[speed-bind-table]");
     for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
         var property = elementValidate[i].getAttribute("speed-bind-table");
-        var strignify = (elementValidate[i].getAttribute("speed-bind-JSON") == "Yes") ? true : false;
+        var strignify = (elementValidate[i].getAttribute("speed-people-JSON") !== null) ? (elementValidate[i].getAttribute("speed-people-JSON").toLowerCase() === "true") : true;
         var inputid = elementValidate[i].getAttribute("id");
         var objproperties = [];
         $("#" + inputid + " > thead > tr > th").each(function () {
@@ -552,25 +583,43 @@ Speed.prototype.bind = function (listObjects, staticBind) {
  * @returns {Array} the Array return contains all controls names
  */
 Speed.prototype.getControls = function (onlyTables) {
-    var pickOnlyTable = (typeof onlyTable === "undefined") ? false : onlyTables
+    var onlyTables = (typeof onlyTables === "undefined") ? false : onlyTables;
     var returnArr = [];
 
     if (!onlyTables) {
         //decides if u want to bind static fields to objects
         //set this option to false if the static fields already contains the same values with the object
         var element = document.querySelectorAll("[speed-bind]");
+        
         for (var i = 0; i <= (element.length - 1); i++) {
             var property = element[i].getAttribute("speed-bind");
-            if ($.inArray(property, returnArr) < 0)
-                returnArr.push(property);
+            var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl) {
+                if ($.inArray(property, returnArr) < 0)
+                    returnArr.push(property);
+            }
         }
 
         //Speed bind and validate html
         var elementValidate = document.querySelectorAll("[speed-bind-validate]");
         for (var i = 0; i <= (elementValidate.length - 1); i++) {
             var property = elementValidate[i].getAttribute("speed-bind-validate");
-            if ($.inArray(property, returnArr) < 0)
-                returnArr.push(property);
+            var includeControl = (elementValidate[i].getAttribute("speed-include-control") === null) ? true : (elementValidate[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl) {
+                if ($.inArray(property, returnArr) < 0)
+                    returnArr.push(property);
+            }
+        }
+
+        //Speed bind and people html
+        var elementPeople = document.querySelectorAll("[speed-bind-people]");
+        for (var i = 0; i <= (elementPeople.length - 1); i++) {
+            var property = elementPeople[i].getAttribute("speed-bind-people");
+            var includeControl = (elementPeople[i].getAttribute("speed-include-control") === null) ? true : (elementPeople[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl) {
+                if ($.inArray(property, returnArr) < 0)
+                    returnArr.push(property);
+            }
         }
     }
 
@@ -578,8 +627,11 @@ Speed.prototype.getControls = function (onlyTables) {
         var element = document.querySelectorAll("[speed-table-data]");
         for (var i = 0; i <= (element.length - 1) ; i++) {
             var property = element[i].getAttribute("speed-table-data");
-            if ($.inArray(property, returnArr) < 0)
-                returnArr.push(property);
+            var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl) {
+                if ($.inArray(property, returnArr) < 0)
+                    returnArr.push(property);
+            }
         }
     }
     return returnArr;
@@ -595,8 +647,8 @@ Speed.prototype.htmlBind = function (listObjects) {
             var element = document.querySelectorAll("[speed-bind='" + key + "']");
             if (element.length > 0) {
                 for (var i = 0; i <= (element.length - 1) ; i++) {
-                    var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? element[i].getAttribute("speed-bind-auto") : "Yes";
-                    if (useAutoBinding === "Yes") {
+                    var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                    if (useAutoBinding) {
                         if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
                             if (element[i].type !== "checkbox")
                                 element[i].value = listObjects[key];
@@ -614,9 +666,9 @@ Speed.prototype.htmlBind = function (listObjects) {
             else {
                 element = document.querySelectorAll("[speed-bind-validate='" + key + "']");
                 if (element.length > 0) {
-                    for (var i = 0; i <= (element.length - 1) ; i++) {
-                        var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? element[i].getAttribute("speed-bind-auto") : "Yes";
-                        if (useAutoBinding === "Yes") {
+                    for (var i = 0; i <= (element.length - 1); i++) {
+                        var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                        if (useAutoBinding) {
                             if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
                                 if (element[i].type !== "checkbox")
                                     element[i].value = listObjects[key];
@@ -631,13 +683,34 @@ Speed.prototype.htmlBind = function (listObjects) {
                         }
                     }
                 }
+                else {
+                    element = document.querySelectorAll("[speed-bind-people='" + key + "']");
+                    if (element.length > 0) {
+                        for (var i = 0; i <= (element.length - 1); i++) {
+                            var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                            if (useAutoBinding) {
+                                if ($.type(listObjects[key]) === "object") {
+                                    element[i].innerHTML = "<p>" + listObjects[key].value + "</p>"; 
+                                }
+                                else {
+                                    var str = "";
+                                    for (z = 0; z < listObjects[key].length; z++) {
+                                        str += "<p>" + listObjects[key][z].value + "</p>";
+                                    }
+                                    element[i].innerHTML = str;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 //================= work in progress ============
-Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tableProperties) {
+Speed.prototype.bindArrayToTable = function (listObjects,parse, tableProperties) {
+    var speedContext = this;
     for (var key in listObjects) {
         if (listObjects.hasOwnProperty(key)) {
             var element = document.querySelectorAll("[speed-bind-table='" + key + "']");
@@ -662,9 +735,9 @@ Speed.prototype.bindArrayToTable = function (speedContext,listObjects,parse, tab
 
 /**
  * The applyValidationEvents function activates the event handlers for the html elements with the speed-bind-validate attribute
- * @param {SP.Context} speedPointContext this parameter is the speedpoint context
  */
-Speed.prototype.applyValidationEvents = function (speedPointContext) {
+Speed.prototype.applyValidationEvents = function () {
+    var speedPointContext = this;
     //Speed bind and validate html
     var elementValidate = document.querySelectorAll("[speed-bind-validate]");
     for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
@@ -714,6 +787,38 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
             }
         }
     }
+
+    var elementPeopleValidate = document.querySelectorAll("[speed-people-validate]");
+    for (var i = 0; i <= (elementPeopleValidate.length - 1); i++) {
+        var elementId = elementPeopleValidate[i].id;
+        var elementNode = document.getElementById(elementId);
+        var msg = elementNode.getAttribute("speed-validate-msg");
+        var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
+        var pickerID = elementId + '_TopSpan';
+        var pickerHashLookupError = elementId + "_Error";
+        var elementDictionary = SPClientPeoplePicker.SPClientPeoplePickerDict[(pickerID)];
+        if (elementDictionary.OnValueChangedClientScript !== null) {
+            speedPointContext.tempCallbacks[pickerID] = elementDictionary.OnValueChangedClientScript;
+        }
+        speedPointContext.tempCallbacks[pickerHashLookupError] = validationMessage;
+        elementDictionary.OnValueChangedClientScript = function (elementDivId, userInfo) {
+            var parentId = elementDivId.slice(0, elementDivId.indexOf("_TopSpan"));
+            var HashLookupError = parentId + "_Error";
+            if (userInfo.length === 0) {
+                speedPointContext.validateField({ id: elementDivId, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+                $("#" + parentId).siblings(".temp-speedmsg").remove();
+                $("<p class='temp-speedmsg'>" + speedPointContext.tempCallbacks[HashLookupError] + "</p>").insertBefore("#" + parentId);
+            }
+            else {
+                $("#" + parentId).siblings(".temp-speedmsg").remove();
+                $("#" + elementDivId).removeClass("speedhtmlerr");
+            }
+
+            if (typeof speedPointContext.tempCallbacks[elementDivId] !== "undefined") {
+                speedPointContext.tempCallbacks[elementDivId](elementDivId, userInfo);
+            }
+        }
+    }
 }
 
 /* ============================== List Section ============================*/
@@ -726,7 +831,7 @@ Speed.prototype.applyValidationEvents = function (speedPointContext) {
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
 Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var setuser = (typeof listProperties.userset === 'undefined') ? false : listProperties.userset;
     var setgroup = (typeof listProperties.groupset === 'undefined') ? false : listProperties.groupset;
     var context = this.initiate();
@@ -807,7 +912,7 @@ Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appC
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
 Speed.prototype.createColumnInList = function (arr, listName, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var genericList = context.get_web().get_lists().getByTitle(listName);
     $.each(arr, function (i, itemProperties) {
@@ -862,7 +967,7 @@ Speed.prototype.createColumnInList = function (arr, listName, onSuccess, onFaile
  * //for cross domain example please reference the docs..............
  */
 Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     if (typeof arr != 'undefined') {
         if (arr.length != 0) {
             var context = this.initiate();
@@ -924,7 +1029,7 @@ Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appC
  * //for cross domain example please reference the docs..............
  */
 Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     if (typeof arr != 'undefined') {
         if (arr.length != 0) {
             var listitemArr = [];
@@ -934,7 +1039,6 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
                 context = appContext.initiate();
             }
             $.each(arr, function (i, itemProperties) {
-                //if(itemProperties.Existing == "No"){
                 var itemCreateInfo = new SP.ListItemCreationInformation();
                 var listItem = reqList.addItem(itemCreateInfo);
                 for (var propName in itemProperties) {
@@ -945,7 +1049,6 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
                 listItem.update();
                 context.load(listItem);
                 listitemArr.push(listItem);
-                //}
             });
             context.executeQueryAsync(function () {
                 setTimeout(function () {
@@ -975,7 +1078,7 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
  * //for cross domain example please reference the docs..............
  */
 Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var oList = context.get_web().get_lists().getByTitle(listname);
     window.speedGlobal.push(oList.getItemById(id));
@@ -1019,7 +1122,7 @@ Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appCon
  * //for cross domain example please reference the docs..............
  */
 Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var oList = context.get_web().get_lists().getByTitle(listName);
     var camlQuery = new SP.CamlQuery();
@@ -1042,7 +1145,6 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
 //* ====================== Helper Functions ========================*//
 /**
  * Exports a List to an Object. Only one list item object is returned based on the query
- * @param {String} SpeedContext the speedpoint object
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
@@ -1052,10 +1154,11 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.getListToControl = function (SpeedContext, listName, caml, controls, onSuccess, onFailed, appContext) {
+Speed.prototype.getListToControl = function (listName, caml, controls, onSuccess, onFailed, appContext) {
+    var SpeedContext = this;
     var controlArray = this.getControls();
     var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var oList = context.get_web().get_lists().getByTitle(listName);
     var camlQuery = new SP.CamlQuery();
@@ -1071,31 +1174,35 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
     context.executeQueryAsync(function () {
         var objectToReturn = {};
         var items = window.speedGlobal[total].getItemAtIndex(0);
+        
         if (typeof items !== "undefined") {
-            for (var i = 0; i <= (controlArray.length - 1) ; i++) {
+            for (var i = 0; i <= (controlsToUse.length - 1) ; i++) {
                 var SPFieldType;
                 try {
-                    SPFieldType = items.get_item(controlArray[i]).__proto__.constructor.__typeName.toLowerCase();
+                    SPFieldType = items.get_item(controlsToUse[i]).__proto__.constructor.__typeName.toLowerCase();
                 }
                 catch (ex) {
                     SPFieldType = "string";
                 }
-                if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
+                if (controlsToUse[i] === "SPItem") {
+                    objectToReturn.SPItem = items;
+                }
+                else if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
                     var objProp = {};
-                    objProp.id = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupId());
-                    objProp.value = SpeedContext.checkNull(items.get_item(controlArray[i]).get_lookupValue());
+                    objProp.id = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_lookupId());
+                    objProp.value = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_lookupValue());
                     if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
                         try {
-                            objProp.email = SpeedContext.checkNull(items.get_item(controlArray[i]).get_email());
+                            objProp.email = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_email());
                         }
                         catch (e) {
                             objProp.email = "";
                         };
                     }
-                    objectToReturn[controlArray[i]] = objProp;
+                    objectToReturn[controlsToUse[i]] = objProp;
                 }
                 else if (SPFieldType.toLowerCase() === "array") {
-                    var multiUser = items.get_item(controlArray[i]);
+                    var multiUser = items.get_item(controlsToUse[i]);
                     var arrayToSave = [];
                     for (var j = 0; j <= (multiUser.length - 1); j++) {
                         var objectOfUsers = {};
@@ -1109,10 +1216,10 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
                         };
                         arrayToSave.push(objectOfUsers);
                     }
-                    objectToReturn[controlArray[i]] = arrayToSave;
+                    objectToReturn[controlsToUse[i]] = arrayToSave;
                 }
                 else
-                    objectToReturn[controlArray[i]] = SpeedContext.checkNull(items.get_item(controlArray[i]));
+                    objectToReturn[controlsToUse[i]] = SpeedContext.checkNull(items.get_item(controlsToUse[i]));
 
             }
         }
@@ -1123,7 +1230,6 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
 
 /**
  * Exports a List to an Array. All list items is returned based on the query
- * @param {String} SpeedContext the speedpoint object
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
@@ -1133,10 +1239,11 @@ Speed.prototype.getListToControl = function (SpeedContext, listName, caml, contr
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.getListToItems = function (SpeedContext, listName, caml, controls, tableonly, conditions, onSuccess, onFailed, appContext) {
+Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, conditions, onSuccess, onFailed, appContext) {
+    var SpeedContext = this;
     var controlArray = this.getControls(tableonly);
     var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
 
     this.getItem(listName, caml, function (itemProperties) {
         var listItems = [];
@@ -1435,7 +1542,7 @@ Speed.prototype.stringnifyDate = function (obj) {
  */
 Speed.prototype.checkNull = function (val) {
     if(typeof val == "string")
-        return val.toString().replace(/(?:\r\n|\r|\n)/g, '<br />');
+        return val.toString();//.replace(/(?:\r\n|\r|\n)/g, '<br />');
     else if (val != null) {
         return val;
     }
@@ -1709,7 +1816,7 @@ Speed.prototype.JSONToObject = function (val, stringType) {
  * });
  */
 Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     //get file extension
     var fileNameSplit = url.split(".");
     var fileExt = fileNameSplit.pop();
@@ -1902,7 +2009,7 @@ Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
  * onQueryFailed is called when all sharepoint async calls fail
  */
 Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSuccess, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     //var people = this.SPClientPeoplePicker.SPClientPeoplePickerDict['relievee_TopSpan'];
     var userDetails = [];
     var ctx = this.initiate();
@@ -1969,14 +2076,14 @@ Speed.prototype.clearPicker = function (people) {
 /* ============================== User Section Section ============================*/
 
 /**
- * The currentUserDetails function gets current logged in user details synchronously
+ * The currentUserDetailsSync function gets current logged in user details synchronously
  * @returns {Object} returns an object with the following properties: id,fullLogin,login,isAdmin,email,title
  * @example
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
  * var userProperties = speedCtx.currentUserDetails();
  */
-Speed.prototype.currentUserDetails = function () {
+Speed.prototype.currentUserDetailsSync = function () {
     var CurrentUserProperties = {};
     CurrentUserProperties.id = _spPageContextInfo.userId;
     CurrentUserProperties.fullLogin = _spPageContextInfo.userLoginName;
@@ -1995,7 +2102,7 @@ Speed.prototype.currentUserDetails = function () {
 };
 
 /**
- * The currentUserDetailsAsync function gets current logged in user details Asynchronously
+ * The currentUserDetails (Async) function gets current logged in user details Asynchronously
  * @param {callBack(SP.User)} callback this parameter is the call back function when the function is successful. a SP.User object is passed as an argument to this callback
  * this argument can be used to retrieve details of the current user
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
@@ -2010,8 +2117,8 @@ Speed.prototype.currentUserDetails = function () {
  * });
  */
 
-Speed.prototype.currentUserDetailsAsync = function (callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+Speed.prototype.currentUserDetails = function (callback, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var speedContextMaster = this.initiate();
     var speedUserMaster = speedContextMaster.get_web().get_currentUser();
     speedContextMaster.load(speedUserMaster);
@@ -2039,14 +2146,13 @@ Speed.prototype.currentUserDetailsAsync = function (callback, onFailed) {
  * });
  */
 Speed.prototype.getUserById = function (usId, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var ctxt = this.initiate();
     var ccbUser = ctxt.get_web().getUserById(usId);
     //runtime method
     ccbUser.retrieve();
     ctxt.load(ccbUser);
     ctxt.executeQueryAsync(function () {
-        //set interval is used because userProperties might not be available is server resources is down
         //set interval is used because userProperties might not be available is server resources is down
         var intervalCount = 0
         window.speedGlobal.push(intervalCount);
@@ -2089,7 +2195,7 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
  * });
  */
 Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var context = this.initiate();
     var userObject = context.get_web().ensureUser(loginName);
     //runtime method 
@@ -2135,7 +2241,7 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
  * });
  */
 Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var clientContext = this.initiate();
     var peopleManager = new SP.UserProfiles.PeopleManager(clientContext);
     var userProfileProperties = peopleManager.getMyProperties();
@@ -2166,7 +2272,7 @@ Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
  * });
  */
 Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyNames, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var userProfileProperties = [];
     var clientContext = this.initiate();
     //Get Instance of People Manager Class
@@ -2198,7 +2304,7 @@ Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyN
  * onQueryFailed is called when all sharepoint async calls fail
  */
 Speed.prototype.createSPGroup = function (title, description, properties, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var assignDefinition = (typeof properties.assigndefinition !== 'undefined') ? properties.assigndefinition : false;
     var roleDefinition = (typeof properties.roledefinition !== 'undefined') ? properties.roledefinition : null;
 
@@ -2272,7 +2378,7 @@ Speed.prototype.createSPGroup = function (title, description, properties, callba
  * });
  */
 Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var users = [];
     var clientContext = this.initiate();
     var collGroup = clientContext.get_web().get_siteGroups();
@@ -2303,10 +2409,9 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
  * @param {callback(enumerator)} callback this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {array} a sharepoint userCollection object (more info about this user is present in this object)
  */
 Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var users = [];
     var clientContext = this.initiate();
     var collGroup = clientContext.get_web().get_siteGroups();
@@ -2332,7 +2437,7 @@ Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
  * @returns {array} an array of enumeration of the userCollection object.
  */
 Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var users = [];
     var context = this.initiate();
     var currentWeb = context.get_web();
@@ -2359,7 +2464,7 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
 }
 
 /**
- * The retrieveMultipleGroupUsers function gets all users in different sharepoint group. this function works for sharepoint 2010 but its not an optimized option.
+ * The retrieveMultipleGroupUsers function gets all users in different sharepoint group.
  * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
  * @param {callback(Array)} callback this parameter is the call back function when the function is successful
  * an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
@@ -2369,7 +2474,7 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
  * @example
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
- * the argument userArray in the callback contains the following properties:  title,id,email,login
+ * the argument userArray in the callback contains the following properties: title, id, email, login
  * speedCtx.retrieveMultipleGroupUsers("HR Admin;Legal",function(userArray){
  *      //here we are just getting the jobtitle and department of the retrieved user
  *      for(var x = 0; x <= (userArray.length - 1); x++){
@@ -2378,7 +2483,7 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
  * });
  */
 Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var users = [];
     var globalContextCount = [];
     if (typeof groupCollection !== 'undefined') {
@@ -2430,7 +2535,7 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
         }
     }
     else {
-        callback(users);
+        throw "group collection is undefined";
     }
 }
 
@@ -2457,8 +2562,9 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
  * });
  */
 Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, callback, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var returnUsers = (typeof userDetails.returnCollection === "undefined") ? false : userDetails.returnCollection;
+    var emailCollection = (typeof userDetails.groupEmails === "undefined") ? false : userDetails.groupEmails;
     var boolVal = false;
     var globalContextCount = [];
     var usersArray = {};
@@ -2472,7 +2578,10 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
             if (boolVal) {
                 break;
             }
-            usersArray[groupNames[i]] = [];
+            usersArray[groupNames[i]] = {};
+            usersArray[groupNames[i]].belongs = false;
+            usersArray[groupNames[i]].users = [];
+            usersArray[groupNames[i]].emails = [];
             groupsAvail = true;
             var oGroup = collGroup.getByName(groupNames[i]);
             window.speedGlobal.push(oGroup.get_users());
@@ -2483,7 +2592,7 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
             clientContext.executeQueryAsync(function () {
                 setTimeout(function () {
                     var totalToUse = globalContextCount[groupFound];
-                    groupFound++;
+                    
                     var userEnumerator = window.speedGlobal[totalToUse].getEnumerator();
                     while (userEnumerator.moveNext()) {
                         var prop = {};
@@ -2495,6 +2604,7 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
                         if (typeof userDetails.login !== "undefined") {
                             if (prop.login === userDetails.login) {
                                 boolVal = true;
+                                usersArray[groupNames[groupFound]].belongs = true;
                                 if(!returnUsers)
                                     break;
                             }
@@ -2502,6 +2612,7 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
                         else if (typeof userDetails.id !== "undefined") {
                             if (prop.id === userDetails.id) {
                                 boolVal = true;
+                                usersArray[groupNames[groupFound]].belongs = true;
                                 if(!returnUsers)
                                     break;
                             }
@@ -2509,17 +2620,26 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
                         else if (typeof userDetails.email !== "undefined") {
                             if (prop.email === userDetails.email) {
                                 boolVal = true;
+                                usersArray[groupNames[groupFound]].belongs = true;
                                 if(!returnUsers)
                                     break;
                             }
                         }
 
-                        if(returnUsers){
-                            usersArray[groupNames[i]].push(prop);
+                        if (returnUsers) {
+                            usersArray[groupNames[groupFound]].users.push(prop);
+                            if (emailCollection) {
+                                if (prop.email !== "" && $.inArray(prop.email, usersArray[groupNames[groupFound]].emails) < 0)
+                                    usersArray[groupNames[groupFound]].emails.push(prop.email);
+                            }
+                        }
+                        else {
+                            usersArray = {};
                         }
                     }
-                    if (groupFound == groupNames.length || boolVal)
-                        callback(boolVal,usersArray);
+                    groupFound++;
+                    if (groupFound == groupNames.length || (boolVal && !returnUsers))
+                        callback(boolVal, usersArray);
                 }, 1500);
             }
                 , Function.createDelegate(this, onFailedCall));
@@ -2530,9 +2650,60 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
         }
     }
     else {
-        callback(boolVal);
+        throw "group collection is undefined";
     }
 }
+
+/**
+ * The isUserMemberOfGroup function checks if the current user belongs to a set of groups (";") seperated. 
+ * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
+ * @param {callback(boolean)} callback this parameter is the call back function when the function is successful.
+ * Boolean value ,true means user belongs to the group collection, false means user doesn't belong to the group collection 
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * isUser is a boolean
+ * speedCtx.isCurrentUserMemberOfGroup("HR Admin;Legal",function(isUser){
+ *      console.log(isUser);
+ * });
+ */
+Speed.prototype.isCurrentUserMemberOfGroup = function (groupCollection, callback, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
+    if (typeof groupCollection !== 'undefined') {
+        var groupNames = groupCollection.split(";");
+        var hashGroups = {};
+        for (var i = 0; i <= (groupNames.length - 1); i++) {
+            hashGroups[groupNames[i]] = i;
+        }
+
+        var clientContext = this.initiate();
+        var currentUser = clientContext.get_web().get_currentUser();
+        clientContext.load(currentUser);
+
+        var userGroups = currentUser.get_groups();
+        clientContext.load(userGroups);
+        clientContext.executeQueryAsync(function(){
+            var isMember = false;
+            var groupsEnumerator = userGroups.getEnumerator();
+            while (groupsEnumerator.moveNext()) {
+                var group = groupsEnumerator.get_current();               
+                var hasValue = hashGroups[group.get_title()];
+                if(typeof hasValue !== "undefined"){
+                    isMember = true;
+                    break;
+                }
+            }
+            callback(isMember);
+        },onFailedCall);
+    }
+    else{
+        throw "group collection is undefined";
+    }
+}
+
 /* ============================== Document Library Section ============================*/
 /**
  * The convertDataURIToBinary function converts DataURI to Base64 byte
@@ -2557,13 +2728,22 @@ Speed.prototype.convertDataURIToBinary = function (dataURI) {
  * The createFolder function creates a folder in a document library
  * @param {String} foldername the name of the folder that should be created
  * @param {String} library the title of the library which the folder will be created
- * @param {callback(folderCollection)} callback this parameter is the call back function when the function is successful
+ * @param {callback(folderCollection)} onSuccess this parameter is the call back function when the function is successful, a SP.FolderCollection object is returned
+ * as an argument.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @returns {object} sharepoint folder object returned
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * 
+ * speedCtx.createFolder("Speedfolder","Documents",function(folderProperties){
+ *      console.log("Folder Created Successfully");
+ * });
  */
 Speed.prototype.createFolder = function (foldername, library, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var docLib = context.get_web().get_lists().getByTitle(library);
     var itemCreateInfo = new SP.ListItemCreationInformation();
@@ -2587,13 +2767,21 @@ Speed.prototype.createFolder = function (foldername, library, onSuccess, onFaile
 /**
  * The deleteFolderOrFile function deletes folder from Libary
  * @param {String} folderDocUrl the url of the folder or file that needs to be deleted
- * @param {callback} callback this parameter is the call back function when the function is successful
+ * @param {callback} onSuccess this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * 
+ * speedCtx.deleteFolderOrFile("/testsite/Documents",function(){
+ *      console.log("Folder/File deleted Successfully");
+ * }); 
  */
 Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined') ? this.onQueryFailed : onFailed;
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var context = this.initiate();
     var oWebsite = context.get_web();
     if (typeof appContext !== 'undefined') {
@@ -2616,19 +2804,28 @@ Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed
 /**
  * The uploadFile function uploades a file to a folder in a Libary or directly to a library itself
  * @param {String} nameOfFile the name of the file to be uploaded
- * @param {String} dataOfFile the dataURI of the file 
+ * @param {String} dataOfFile the dataURI of the file
  * @param {String} folder the folder where the file will be uploaded
- * @param {String} filetype the filetype of the file, null should passed if file is not txt
- * @param {function} onSuccess this parameter is the call back function when the function is successful
+ * @param {callback(SP.File)} onSuccess this parameter is the call back function when the upload is successful. The SP.File object is returned as an argument
+ * when the upload is successful.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} sharepoint file object returned
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * 
+ * speedCtx.uploadFile("testfile","data64string(test)", "/testsite/documents/",function(fileProperties){
+ *      console.log("Folder/File uploaded Successfully");
+ * });
  */
-Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, filetype, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, onSuccess, onFailed, appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var ctx2 = this.initiate();
-    if (filetype != "txt")
+    var fileNameSplit = nameOfFile.split(".");
+    var filetype = fileNameSplit.pop();
+    if (filetype.toLowerCase() != "txt")
         var data = this.convertDataURIToBinary(dataOfFile);
     else
         var data = dataOfFile;
@@ -2638,7 +2835,7 @@ Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, filetype,
     fileCreateInfo.set_overwrite(true);
     fileCreateInfo.set_content(new SP.Base64EncodedByteArray());
     for (var i = 0; i < data.length; ++i) {
-        if (filetype != "txt")
+        if (filetype.toLowerCase() != "txt")
             fileCreateInfo.get_content().append(data[i]);
         else
             fileCreateInfo.get_content().append(data.charCodeAt(i));
@@ -2661,17 +2858,28 @@ Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, filetype,
 /**
  * The uploadFile function uploades a file to a folder in a Libary or directly to a library itself
  * @param {String} fileArr an array of file objects with properties dataName & dataURI
- * @param {String} folderUrl the folder url where the files will be uploaded to 
+ * @param {String} folderUrl the folder url where the files will be uploaded to
  * @param {String} fileCount the index of the file object to start in the array
- * @param {function} feedBack the feedback function is called after each file has been uploaded successfully
- * @param {function} onSuccess this parameter is the call back function when all the files have been uploaded successfully
+ * @param {callback(percentCompleted,SP.File)} feedBack the feedback function is called after each file has been uploaded successfully. It returns to arguments, the 
+ * first argument show the percentage of files that have been uploaded successfully, while the second argument contains the SP.FIle object of the currently uploaded file.
+ * @param {callback} onSuccess this parameter is the call back function when all the files have been uploaded successfully
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} percentage upload (Int) as the first parameter, sharepoint file object returned as a second parameter
+ * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * 
+ * speedCtx.uploadMultipleFiles([{dataName: "testdoc.doc", dataURI: 'data64string' ], "/testsite/documents/",0,function(uploadStatus,fileDetails){
+ *      console.log(uploadStatus + "%");
+ * },function(){
+ *      console.log("All files uploaded successfully");
+ * });
  */
-Speed.prototype.uploadMultipleFiles = function (speedContext,fileArr, folderUrl, fileCount, feedBack, onSuccess, onFailed, appContext) {
-    speedContext.uploadFile(fileArr[fileCount].dataName, fileArr[fileCount].dataURI, folderUrl, null, function (fileDetails) {
+Speed.prototype.uploadMultipleFiles = function (fileArr, folderUrl, fileCount, feedBack, onSuccess, onFailed, appContext) {
+    var speedContext = this;
+    speedContext.uploadFile(fileArr[fileCount].dataName, fileArr[fileCount].dataURI, folderUrl, function (fileDetails) {
         var totalFiles = fileArr.length;
         var newNumber = parseInt(fileCount) + 1;
         var completed = (newNumber / totalFiles) * 100;
@@ -2680,14 +2888,78 @@ Speed.prototype.uploadMultipleFiles = function (speedContext,fileArr, folderUrl,
             onSuccess();
         }
         else {
-            speedContext.uploadMultipleFiles(speedContext,fileArr, folderUrl, newNumber, feedBack, onSuccess, onFailed, appContext);
+            speedContext.uploadMultipleFiles(fileArr, folderUrl, newNumber, feedBack, onSuccess, onFailed, appContext);
         }
     }, onFailed, appContext);
 }
 
+/**
+ * The addAttachmentToItem function uploads a files to the attachment folder of a list item
+ * @param {String} itemID the ID of the Item the file will be uploaded to
+ * @param {String} listName the name of the list the item belongs to
+ * @param {String} fileArr an array of file objects with properties dataName & dataURI
+ * @param {callback(percentCompleted,SP.File)} feedBack the feedback function is called after each file has been uploaded successfully. It returns to arguments, the 
+ * first argument show the percentage of files that have been uploaded successfully, while the second argument contains the SP.FIle object of the currently uploaded file.
+ * @param {callback} onSuccess this parameter is the call back function when all the files have been uploaded successfully
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ * 
+ * @example
+ * // returns a normal context related to the current site
+ * var speedCtx = new Speed();
+ * 
+ * speedCtx.addAttachmentToItem("1","Documents",[{dataName: "testdoc.doc", dataURI: 'data64string' ],function(uploadStatus,fileDetails){
+ *      console.log(uploadStatus + "%");
+ * },function(){
+ *      console.log("All files uploaded successfully");
+ * });
+ */
+Speed.prototype.addAttachmentToItem = function (itemID,listName,fileArr,feedback,onSuccess, onFailed, appContext) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var context = this.initiate();
+    var web = context.get_web();
+    var list = web.get_lists().getByTitle(listName);
+    if (typeof appContext !== 'undefined') {
+        context = appContext.initiate();
+    }
+    context.load(list,'RootFolder');
+    var item = list.getItemById(itemID);
+    context.load(item);
+    context.executeQueryAsync(function(){
+        if(!item.get_fieldValues()['Attachments']){
+            var attachmentRootFolderUrl = String.format('{0}/Attachments', list.get_rootFolder().get_serverRelativeUrl());
+            var attachmentsRootFolder = context.get_web().getFolderByServerRelativeUrl(attachmentRootFolderUrl);
+            //var attachmentsFolder = attachmentsRootFolder.get_folders().add(itemID);
+            var attachmentsFolder = attachmentsRootFolder.get_folders().add('_' + itemID);
+            attachmentsFolder.moveTo(attachmentRootFolderUrl + '/' + itemID);
+        }
+        else{
+            //
+            var attachmentRootFolderUrl = String.format('{0}/Attachments/{1}', list.get_rootFolder().get_serverRelativeUrl(),itemID);
+            var attachmentsFolder = context.get_web().getFolderByServerRelativeUrl(attachmentRootFolderUrl);
+        }
+        context.load(attachmentsFolder);
+        context.executeQueryAsync(function(){
+            var folderUrl = attachmentsFolder.get_serverRelativeUrl();
+            var fileCount = 0;
+            speedContext.uploadMultipleFiles(fileArr,folderUrl,fileCount,feedback,onSuccess,onFailed,appContext);
+        }, Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
+};
+
 //=============================read data from text file ========================
-Speed.prototype.readFile = function (fileurlPassed, onSuccess, onFailed, appContext) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+/**
+ * The readFile function reads content of a file
+ * @param {String} fileurl the url of the file you want to read the contents
+ * @param {callback(data)} onSuccess this parameter is the call back function when the file is successfully read, the data of the file is returned as an argument
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.readFile = function (fileurl, onSuccess, onFailed, appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var ctx = this.initiate();
     var oWebsite = ctx.get_web();
     if (typeof appContext !== 'undefined') {
@@ -2695,7 +2967,7 @@ Speed.prototype.readFile = function (fileurlPassed, onSuccess, onFailed, appCont
     }
     ctx.load(oWebsite);
     ctx.executeQueryAsync(function () {
-        var fileUrl = fileurlPassed;
+        var fileUrl = fileurl;
         $.ajax({
             url: fileUrl,
             type: "GET"
@@ -2706,8 +2978,17 @@ Speed.prototype.readFile = function (fileurlPassed, onSuccess, onFailed, appCont
 }
 
 //------------------------check if file exist in documnet library---------------------
-Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed) {
-    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.onQueryFailed : onFailed;
+/**
+ * The getFileExists function checks if a file exist on sharepoint
+ * @param {String} fileurl the url of the file to check
+ * @param {callback(state)} onSuccess this parameter is the call back function when the call was successful, a boolean value is returned as an argument.
+ * true if the file exist and false if the file doesn't
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed,appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var ctx = this.initiate();
     var file = ctx.get_web().getFileByServerRelativeUrl(fileUrl);
     if (typeof appContext !== 'undefined') {
@@ -2728,8 +3009,7 @@ Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed) {
 }
 
 /**
- * The uploadFile function uploades a file to a folder in a Libary or directly to a library itself
- * @param {object} speedContext the SPcontext where the log will be written to
+ * The logWriter function upload or updates a text file in a Libary, this is used for keeping logs
  * @param {string} fileName the name of the log file
  * @param {string} logContent the content of the log file
  * @param {string} library the library where the log file will be saved
@@ -2739,9 +3019,10 @@ Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed) {
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @returns {object} percentage upload (Int) as the first parameter, sharepoint file object returned as a second parameter
  */
-Speed.prototype.logWriter = function (speedContext, fileName, logContent, library, libraryUrl, logLimit, callback, onFailed, appContext) {
+Speed.prototype.logWriter = function (fileName, logContent, library, libraryUrl, logLimit, callback, onFailed, appContext) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var query = [{ orderby: "ID", rowlimit: 1, ascending: "FALSE" }];
     speedContext.getItem(library, speedContext.camlBuilder(query), function (speedlog) {
         var logsCount = 0;
@@ -2754,20 +3035,20 @@ Speed.prototype.logWriter = function (speedContext, fileName, logContent, librar
             itemDetails.size = listEnumerator.get_current().get_item('File_x0020_Size');
         }
         if (logsCount == 0 || itemDetails.size > logLimit) {
-            //this logs of file if no log text file is present or if the log is greater than 20mb
-            speedContext.uploadFile(fileName, logContent, libraryUrl, "txt", callback, onFailed, appContext);
+            //this logs of file if no log text file is present or if the log is greater than limit passed
+            speedContext.uploadFile(fileName, logContent, libraryUrl, callback, onFailed, appContext);
         }
         else {
             speedContext.readFile(itemDetails.url, function (data) {
                 data += logContent;
-                speedContext.uploadFile(itemDetails.name, data, libraryUrl, "txt", callback, onFailed, appContext);
+                speedContext.uploadFile(itemDetails.name, data, libraryUrl, callback, onFailed, appContext);
             }, function (err) {
                 setTimeout(function () {
-                    onFailed(err);
+                    onFailedCall(err);
                 }, 1000);
             })
         }
-    });
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /* ============================== Debugging Section  ============================*/
@@ -2862,18 +3143,20 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
 /* ============================== Table Section ============================*/
 /**
  * Exports a List to an Table. Creates the TBody content of a list based on the query
- * @param {String} SpeedContext the speedpoint object
  * @param {String} listName this parameter specifices the list which the data are to be retrieved
  * @param {String} caml this parameter specifices the caml query to be used for the list
  * @param {Array} controls this parameter specifices the Extra Column data to be added, Array of Strings
- * @param {Function} conditions this parameter includes special conditions for each object properties, condition must return an object
- * @param {Function} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved
+ * @param {Function} conditions this parameter includes special conditions for each object properties, condition must return an object. look up getListToItems to see
+ *  definition of this parameter
+ * @param {callback(itemsData)} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved.the items reterived 
+ *  is passed as an argument of type Array
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = Object] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.getListToTable = function (SpeedContext, listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
+Speed.prototype.getListToTable = function (listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
+    var SpeedContext = this;
     SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
-    this.getListToItems(SpeedContext, listName, caml, controls,true, conditions, function (requestItems) {
+    SpeedContext.getListToItems(listName, caml, controls,true, conditions, function (requestItems) {
         //gets only table controls
         var tableControls = SpeedContext.getControls(true);
         SpeedContext.DataForTable.tabledata = requestItems;
