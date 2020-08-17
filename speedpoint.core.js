@@ -1,3 +1,9 @@
+/*
+Speedpoint.core.js
+Property of Agbagwu Christian Oge
+Sharepoint Developer
+Contact +2348162763300
+*/
 //Intellectual property of agabagwu christian 
 //sharepoint jsom developer 
 //
@@ -32,8 +38,354 @@ function Speed(cxt, bolval) {
     this.optional = (typeof bolval === 'undefined') ? false : bolval;
     this.errorHandler = this.onQueryFailed;
     this.tempCallbacks = {};
-    if (typeof window.speedGlobal === 'undefined')
+    this.htmlDictionary = {};
+    this.peopleDictionary = {
+        count: 0,
+        total: 0,
+        picker: {}
+    };
+    this.filesDictionary = {};
+    this.intervalRefDictionary = {};
+    this.currencySettings = {};
+    this.appliedEvents = {
+        normal: [],
+        numeric: [],
+        attachments: []
+    };
+
+    this.asyncDictionary = {
+        totalcalls: 0,
+        expectedcalls: 0,
+        callbackwhendependenciesLoaded: false,
+        alldependenciesLoadedDef: null
+    };
+
+    if (typeof window.speedGlobal === 'undefined') {
         window.speedGlobal = [];
+    }
+
+    /**
+     * Properties for the table to be created
+     */
+    this.DataForTable = {
+        tabledata: [],
+        tablegroupName: "",
+        noOfPages: 0,
+        currentPage: 1,
+        pagesize: 30,
+        paginateSize: 5,
+        currentPos: 1,
+        lastPageItem: 0,
+        activeClass: "",
+        tablecontentId: "",
+        includeSN: true,
+        modifyTR: false,
+        context: this,
+        lazyLoadInitiated: false,
+        tdClick: {},
+        customPaginate: false,
+        customBlock: "",
+        paginationbId: "noOfPages",
+        paginationuId: "noOfPagesUp",
+        onpageBeforeclick: null,
+        onpageAfterclick: null,
+        //this is responsible for paginating the table
+        paginateLinks: function (srt, end, settings) {
+            $("#" + settings.paginationbId).empty();
+            $("#" + settings.paginationuId).empty();
+            if (end > settings.noOfPages) {
+                end = settings.noOfPages;
+            }
+            $("#" + settings.paginationbId).append("<li> <a class='" + settings.tablecontentId + "-moveback'><<</a> </li>");
+            $("#" + settings.paginationuId).append("<li> <a class='" + settings.tablecontentId + "-moveback'><<</a> </li>");
+            for (srt; srt <= end; srt++) {
+
+                if (srt == settings.activeClass) {
+                    $("#" + settings.paginationbId).append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                    $("#" + settings.paginationuId).append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                } else {
+                    $("#" + settings.paginationbId).append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                    $("#" + settings.paginationuId).append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+                }
+            }
+            $("#" + settings.paginationbId).append("<li> <a class='" + settings.tablecontentId + "-movefront'>>></a> </li>");
+            $("#" + settings.paginationuId).append("<li> <a class='" + settings.tablecontentId + "-movefront'>>></a> </li>");
+            $("." + settings.tablecontentId).click(function () {
+                settings.nextItems($(this).text(), settings);
+            });
+
+            $("." + settings.tablecontentId + "-moveback").click(function () {
+                settings.moveLinks("back", settings);
+            });
+
+            $("." + settings.tablecontentId + "-movefront").click(function () {
+                settings.moveLinks("front", settings);
+            });
+        },
+        //this is responsible for showing the next items the table
+        nextItems: function (id, settings) {
+            if (settings.tabledata.length != 0) {
+                //perform actions before the items get arragnge clicks
+                try {
+                    settings.onpageBeforeclick();
+                } catch (e) {}
+
+                $(".lin" + settings.activeClass).removeClass('active');
+                $(".lin" + id).addClass('active');
+                settings.activeClass = id;
+                $('#' + settings.tablecontentId).empty();
+                var old = id - 1;
+                var total = settings.tabledata.length;
+                var previousItem = old * settings.pagesize;
+                var nextPageItem = id * settings.pagesize;
+                if (nextPageItem > total) {
+                    nextPageItem = total;
+                }
+                var str = "";
+                var tableControls = settings.context.getControls(true, settings.tablegroupName);
+                for (previousItem; previousItem < nextPageItem; previousItem++) {
+                    if (!settings.customPaginate) {
+                        if (settings.modifyTR) {
+                            str += settings.context.DataForTable.trExpression(previousItem);
+                        } else {
+                            str += "<tr>";
+                        }
+                        if (settings.includeSN) {
+                            str += "<td>" + (previousItem + 1) + "</td>";
+                        }
+                        for (var propName in settings.tabledata[previousItem]) {
+                            if ($.inArray(propName, tableControls) >= 0) {
+                                var groupName = $("[speed-table-data='" + propName + "']").attr("speed-table-group");
+                                groupName = (typeof groupName !== "undefined") ? groupName : "SP-NOTApplicable";
+                                var useTD = $("[speed-table-data='" + propName + "']").attr("speed-table-includetd");
+                                useTD = (typeof useTD !== "undefined") ? (useTD === "true") : true;
+                                if (settings.propertiesHandler.hasOwnProperty(propName)) {
+                                    if (useTD) {
+                                        str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem], previousItem) + "</td>";
+                                    } else
+                                        str += settings.propertiesHandler[propName](settings.tabledata[previousItem], previousItem);
+                                } else if (settings.propertiesHandler.hasOwnProperty(groupName)) {
+                                    if (useTD) {
+                                        str += "<td>" + settings.propertiesHandler[groupName](settings.tabledata[previousItem], previousItem, propName) + "</td>";
+                                    } else
+                                        str += settings.propertiesHandler[propName](settings.tabledata[previousItem], previousItem, propName);
+                                } else
+                                    str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
+                            }
+                        }
+                        str += "</tr>";
+                    } else {
+                        var innerElement = settings.customBlock;
+                        for (var propName in settings.tabledata[previousItem]) {
+                            try {
+                                var stringToFind = "{{" + propName + "}}";
+                                var regex = new RegExp(stringToFind, "g");
+                                innerElement = innerElement.replace(regex, settings.tabledata[previousItem][propName]);
+                            } catch (e) {}
+                        }
+                        str += innerElement;
+                    }
+                }
+                $('#' + settings.tablecontentId).append(str);
+
+                //perform actions after the items get arragnge clicks
+                try {
+                    settings.onpageAfterclick();
+                } catch (e) {}
+            }
+        },
+        //this is responsible for moving to the new set of links
+        moveLinks: function (id, settings) {
+            if (id == "front") {
+                settings.currentPos = settings.currentPos + settings.paginateSize;
+                var startPos = settings.currentPos;
+                var endPos = startPos + settings.paginateSize - 1;
+                if (endPos >= settings.noOfPages) {
+                    endPos = settings.noOfPages;
+                }
+                settings.paginateLinks(startPos, endPos, settings);
+                $("#" + settings.paginationbId + " li a." + settings.tablecontentId + "-moveback").show();
+                $("#" + settings.paginationuId + " li a." + settings.tablecontentId + "-moveback").show();
+                if (endPos >= settings.noOfPages) {
+                    $("#" + settings.paginationbId + " li a." + settings.tablecontentId + "-movefront").hide();
+                    $("#" + settings.paginationuId + " li a." + settings.tablecontentId + "-movefront").hide();
+                }
+            } else {
+                settings.currentPos = settings.currentPos - settings.paginateSize;
+                var startPos = settings.currentPos;
+                var endPos = startPos + settings.paginateSize - 1;
+                if (startPos <= 1) {
+                    startPos = 1;
+                    currentPos = 1;
+                }
+                settings.paginateLinks(startPos, endPos, settings);
+                $("#" + settings.paginationbId + " li a." + settings.tablecontentId + "-movefront").show();
+                $("#" + settings.paginationuId + " li a." + settings.tablecontentId + "-movefront").show();
+                if (startPos <= 1) {
+                    $("#" + settings.paginationbId + " li a." + settings.tablecontentId + "-moveback").hide();
+                    $("#" + settings.paginationuId + " li a." + settings.tablecontentId + "-moveback").hide();
+                }
+            }
+        },
+        propertiesHandler: {}
+    }
+
+    /* ============================== Validation Section ============================*/
+    //Extendable validation logic properties. This is where custom validation logic can be introduced to speedpoint
+
+    this.validationProperties = {
+        "number": {
+            type: "number",
+            extend: {},
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value);
+                    } catch (e) {
+                        $spcontext.debugHandler("1111", this.type, id, extension);
+                    }
+                } else if (value.trim() == "") {
+                    return false;
+                } else if (isNaN(value)) {
+                    return false;
+                } else
+                    return true;
+            }
+        },
+        "radio": {
+            type: "radio",
+            extend: {
+
+            },
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value);
+                    } catch (e) {
+                        $spcontext.debugHandler("1111", this.type, id, extension);
+                    }
+                } else if (typeof value === "undefined" || value === "") {
+                    return false;
+                } else
+                    return true;
+            }
+        },
+        "checkbox": {
+            type: "checkbox",
+            extend: {
+                multivalue: function (value, id) {
+                    var boolT = value;
+                    if (!value) {
+                        var elementProperties = document.getElementById(id);
+                        var attributeValue = elementProperties.getAttribute("speed-bind-validate");
+                        var element = document.querySelectorAll("[speed-bind-validate='" + attributeValue + "']");
+                        for (var i = 0; i <= (element.length - 1); i++) {
+                            if (element[i].type == "checkbox") {
+                                if (element[i].checked) {
+                                    boolT = true;
+                                    break
+                                }
+                            } else {
+                                $spcontext.debugHandler("1113", this.type, id, "multivalue");
+                                boolT = false;
+                                break;
+                            }
+                        }
+
+                    }
+                    return boolT;
+                }
+            },
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value, id);
+                    } catch (e) {
+                        $spcontext.debugHandler("1111", this.type, id, extension);
+                    }
+                } else {
+                    return value;
+                }
+            }
+        },
+        "file": {
+            type: "file",
+            extend: {
+                File: function (value) {
+                    var rg1 = /^[^\\/:\*\?"<>\|]+$/; // forbidden characters \ / : * ? " < > |
+                    var rg2 = /^\./; // cannot start with dot (.)
+                    var rg3 = /^(nul|prn|con|lpt[0-9]|com[0-9])(\.|$)/i; // forbidden file names
+                    return rg1.test(value) && !rg2.test(value) && !rg3.test(value);
+                }
+            },
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value);
+                    } catch (e) {
+                        $spcontext.debugHandler("1114", this.type, id, extension);
+                    }
+                } else {
+                    return this.extend["File"](value);
+                }
+            }
+        },
+        "email": {
+            type: "email",
+            extend: {
+                Email: function (value) {
+                    var patt = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
+                    if (!patt.test(value)) {
+                        return false;
+                    } else
+                        return true;
+                }
+            },
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value);
+                    } catch (e) {
+                        $spcontext.debugHandler("1111", this.type, id, extension);
+                    }
+                } else {
+                    return this.extend["Email"](value);
+                }
+            }
+        },
+        "text": {
+            type: "text",
+            extend: {
+                IP: function (value) {
+                    var patt = new RegExp(/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/);
+                    if (!patt.test(value)) {
+                        return false;
+                    } else
+                        return true;
+                },
+                Email: function (value) {
+                    var patt = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
+                    if (!patt.test(value)) {
+                        return false;
+                    } else
+                        return true;
+                }
+            },
+            validate: function (value, extension, id) {
+                if (extension !== "") {
+                    try {
+                        return this.extend[extension](value);
+                    } catch (e) {
+                        $spcontext.debugHandler("1111", this.type, id, extension);
+                    }
+                } else if (value.trim() === "") {
+                    return false;
+                } else
+                    return true;
+            }
+        }
+    }
+
     if (!this.checkScriptDuplicates('jquery'))
         console.warn("SpeedPoint requires jquery, please add jquery to the dom...");
 }
@@ -44,14 +396,12 @@ Speed.prototype.initiate = function () {
     if (typeof this.url === 'undefined') {
         var context = new SP.ClientContext.get_current();
         return context;
-    }
-    else {
+    } else {
         if (typeof this.url !== 'undefined' && this.optional) {
             var context = new SP.ClientContext.get_current();
             var appContextSite = new SP.AppContextSite(context, this.url);
             return appContextSite;
-        }
-        else {
+        } else {
             var context = new SP.ClientContext(this.url);
             return context;
         }
@@ -84,11 +434,11 @@ Speed.prototype.initiate = function () {
  * },{requestExecutor: true, clientPeoplePicker: true, userProfile: true});
  */
 Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase) {
+    properties = (typeof properties !== "undefined") ? properties : {};
     scriptbase = (typeof scriptbase == "undefined" || scriptbase == null) ? "/_layouts/15/" : (scriptbase + "/_layouts/15/");
-    var duplicateExists = this.checkScriptDuplicates("sp.js");
-    if (typeof properties !== "undefined" && properties !== null &&
-            !this.checkScriptDuplicates("SP.UserProfiles.js") && !this.checkScriptDuplicates("clientpeoplepicker.js")) {
-
+    if (typeof properties !== "undefined" &&
+        (!this.checkScriptDuplicates("SP.RequestExecutor.js") || !this.checkScriptDuplicates("clientpeoplepicker.js"))) {
+        //Load scripts without SP.js dependency
         if (!this.checkScriptDuplicates("SP.RequestExecutor.js") && typeof properties.requestExecutor !== "undefined" &&
             properties.requestExecutor) {
             $.getScript(scriptbase + "SP.RequestExecutor.js");
@@ -96,33 +446,61 @@ Speed.prototype.loadSPDependencies = function (callBack, properties, scriptbase)
 
         if (typeof properties.clientPeoplePicker !== "undefined" && properties.clientPeoplePicker) {
             //load all client peoplepicker js dependencies 
-            $.getScript(scriptbase + "clienttemplates.js", 
-                $.getScript(scriptbase + "clientforms.js", 
-                    $.getScript(scriptbase + "autofill.js", 
-                        $.getScript(scriptbase + "clientpeoplepicker.js", function (){setTimeout(workflowScripts, 1000);})
+            $.getScript(scriptbase + "clienttemplates.js",
+                $.getScript(scriptbase + "clientforms.js",
+                    $.getScript(scriptbase + "autofill.js",
+                        $.getScript(scriptbase + "clientpeoplepicker.js", function () {
+                            setTimeout(workflowScripts, 1000);
+                        })
                     )
                 )
             );
+        } else {
+            setTimeout(function () {
+                workflowScripts();
+            }, 1000);
         }
-        else {
-            setTimeout(workflowScripts, 1000);
-        }
-    }
-    else {
+    } else {
         workflowScripts();
     }
 
     function workflowScripts() {
-        if (typeof properties.userProfile !== "undefined") {
-            if (properties.userProfile) {
-                SP.SOD.executeFunc("sp.js", 'SP.ClientContext', function () {
+        SP.SOD.executeOrDelayUntilScriptLoaded(function () {
+            //Load scripts with SP.js dependency
+            var methodSet = '';
+            if (properties.userProfile !== "undefined") {
+                if (properties.userProfile) {
+                    RegisterSodDep('callBack', "SP.UserProfiles.js");
                     $.getScript(scriptbase + "SP.UserProfiles.js");
-                    SP.SOD.executeOrDelayUntilScriptLoaded(callBack, 'SP.UserProfiles.js');
-                });
+                    methodSet = 'SP.UserProfiles.js';
+                }
             }
+
+            if (properties.search !== "undefined") {
+                if (properties.search) {
+                    RegisterSodDep('callBack', "SP.Search.js");
+                    $.getScript(scriptbase + "SP.Search.js");
+                    methodSet = 'SP.Search.js';
+                }
+            }
+
+            if (methodSet !== "") {
+                SP.SOD.executeOrDelayUntilScriptLoaded(callBack, methodSet);
+            } else if (typeof properties.userProfile === "undefined" && typeof properties.search === "undefined") {
+                callBack();
+            }
+        }, "sp.js");
+        SP.SOD.executeFunc("sp.js", 'SP.ClientContext', null);
+    }
+}
+
+Speed.prototype.asyncManager = function () {
+    this.asyncDictionary.totalcalls++;
+
+    if (this.asyncDictionary.callbackwhendependenciesLoaded && typeof this.asyncDictionary.alldependenciesLoadedDef === "function") {
+        if (this.asyncDictionary.totalcalls == this.asyncDictionary.expectedcalls) {
+            this.asyncDictionary.alldependenciesLoadedDef();
         }
-        else
-            SP.SOD.executeFunc("sp.js", 'SP.ClientContext', callBack);
     }
 }
 
@@ -142,7 +520,7 @@ Speed.prototype.camlBuilder = function (cal) {
     var Arr = [];
     if (typeof cal !== 'undefined' && cal.length > 1) {
         var usedtottal = cal.length - 1;
-        for (var i = 1; i <= usedtottal ; i++) {
+        for (var i = 1; i <= usedtottal; i++) {
             noOfFields.push(cal[i].val);
             if (cal[i].val != '') {
                 noOfUsed++;
@@ -154,24 +532,25 @@ Speed.prototype.camlBuilder = function (cal) {
         var queryString = '<View><Query>';
         if (this.CheckNoofUsedFields(noOfFields, 'one')) {
             queryString += '<Where>';
-            for (var i = 0; i <= total ; i++) {
+            for (var i = 0; i <= total; i++) {
                 if (!this.CheckNoofUsedFields(noOfFields, 'onlyone') && (count == 0 || total - i >= 1)) {
                     if (typeof Arr[i].evaluator != 'undefined') {
                         queryString += '<' + Arr[i].evaluator + '>';
-                    }
-                    else
+                    } else
                         queryString += '<' + cal[0].evaluator + '>';
                     andCount++;
                 }
                 if (typeof Arr[i].support != 'undefined')
                     queryString += "<" + Arr[i].operator + "><FieldRef Name=\'" + Arr[i].field + "\'/><Value Type=\'" + Arr[i].type + "\' " + Arr[i].support.title + "=\'" + Arr[i].support.value + "\'>" + Arr[i].val + "</Value></" + Arr[i].operator + ">";
-                else if (typeof Arr[i].author != 'undefined')
-                    queryString += "<" + Arr[i].operator + "><FieldRef Name=\'" + Arr[i].field + "\' " + Arr[i].author.title + "=\'" + Arr[i].author.value + "\' /><Value Type=\'" + Arr[i].type + "\'>" + Arr[i].val + "</Value></" + Arr[i].operator + ">";
-                else
+                else if (typeof Arr[i].lookup != 'undefined')
+                    queryString += "<" + Arr[i].operator + "><FieldRef Name=\'" + Arr[i].field + "\' " + Arr[i].lookup.title + "=\'" + Arr[i].lookup.value + "\' /><Value Type=\'" + Arr[i].type + "\'>" + Arr[i].val + "</Value></" + Arr[i].operator + ">";
+                else if (Arr[i].operator === "IsNull" || Arr[i].operator === "IsNotNull") {
+                    queryString += "<" + Arr[i].operator + "><FieldRef Name=\'" + Arr[i].field + "\'/></" + Arr[i].operator + ">";
+                } else
                     queryString += "<" + Arr[i].operator + "><FieldRef Name=\'" + Arr[i].field + "\'/><Value Type=\'" + Arr[i].type + "\'>" + Arr[i].val + "</Value></" + Arr[i].operator + ">";
                 count++;
             }
-            for (var x = (andCount - 1) ; x >= 0; x--) {
+            for (var x = (andCount - 1); x >= 0; x--) {
                 if (typeof Arr[x].evaluator != 'undefined')
                     queryString += '</' + Arr[x].evaluator + '>';
                 else
@@ -186,8 +565,7 @@ Speed.prototype.camlBuilder = function (cal) {
         if (typeof cal[0].rowlimit != 'undefined')
             queryString += '<RowLimit>' + cal[0].rowlimit + '</RowLimit>';
         queryString += '</View>';
-    }
-    else {
+    } else {
         var queryString = '<View><Query>';
         if (typeof cal != 'undefined') {
             if (typeof cal[0].ascending != 'undefined' && typeof cal[0].orderby != 'undefined')
@@ -216,7 +594,7 @@ Speed.prototype.CheckNoofUsedFields = function (Arr, val) {
     if (val == 'onlyone') {
         var count = 0;
         var oneE = false;
-        for (var y = 0; y <= Arr.length - 1 ; y++) {
+        for (var y = 0; y <= Arr.length - 1; y++) {
             if (this.checkNull(Arr[y]) != '')
                 count++;
         }
@@ -226,88 +604,6 @@ Speed.prototype.CheckNoofUsedFields = function (Arr, val) {
         return oneE;
     }
 };
-
-/* ============================== Validation Section ============================*/
-//Extendable validation logic properties. This is where custom validation logic can be introduced to speedpoint
-
-Speed.prototype.validationProperties = {
-    "number": {
-        type: "number",
-        extend: {},
-        validate: function (value, extension) {
-            if (extension !== "") {
-                return this.extend[extension](value);
-            }
-            else if (value.trim() == "") {
-                return false;
-            }
-            else if (isNaN(value)) {
-                return false;
-            }
-            else
-                return true;
-        }
-    },
-    "checkbox": {
-        type: "checkbox",
-        extend: null,
-        validate: function (value) {
-            return value;
-        }
-    },
-    "email": {
-        type: "email",
-        extend: {
-            Email: function (value) {
-                var patt = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
-                if (!patt.test(value)) {
-                    return false;
-                }
-                else
-                    return true;
-            }
-        },
-        validate: function (value, extension) {
-            if (extension !== "") {
-                return this.extend[extension](value);
-            }
-            else{
-                return this.extend["Email"](value);
-            }
-        }
-    },
-    "text": {
-        type: "text",
-        extend: {
-            IP: function (value) {
-                var patt = new RegExp(/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/);
-                if (!patt.test(value)) {
-                    return false;
-                }
-                else
-                    return true;
-            },
-            Email: function (value) {
-                var patt = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);
-                if (!patt.test(value)) {
-                    return false;
-                }
-                else
-                    return true;
-            }
-        },
-        validate: function (value, extension) {
-            if (extension !== "") {
-                return this.extend[extension](value);
-            }
-            else if (value.trim() === "") {
-                return false;
-            }
-            else
-                return true;
-        }
-    }
-}
 
 Speed.prototype.validationReturn = function (id, msg, addErrors, callback) {
     var optid = (typeof id === 'undefined') ? '' : id;
@@ -357,32 +653,45 @@ Speed.prototype.validateField = function (elementObj) {
     var elementType = "text";
     var elementVisible = true;
     if (elementObj.useElementProperties) {
-        var elementProperties = document.getElementById(elementObj.id);
-        if (elementProperties.tagName.toLowerCase() === "textarea" || elementProperties.tagName.toLowerCase() === "select") { }
-        else
-            elementType = elementProperties.type.toLowerCase();
-        try {
-            if (elementProperties.type === "checkbox")
-                valueToValidate = elementProperties.checked;
-            else
-                valueToValidate = elementProperties.value.trim();
-            valueToValidate = this.checkNull(valueToValidate);
+
+        if (elementObj.id !== null) {
+            var elementProperties = document.getElementById(elementObj.id);
+            if (elementProperties.tagName.toLowerCase() === "textarea" || elementProperties.tagName.toLowerCase() === "select") {} else
+                elementType = elementProperties.type.toLowerCase();
+
+            try {
+                if (elementProperties.type === "checkbox")
+                    valueToValidate = elementProperties.checked;
+                else if (elementProperties.type === "radio") {
+                    valueToValidate = $("input[name='" + elementProperties.name + "']:checked").val();
+                    valueToValidate = (typeof valueToValidate === "undefined") ? "" : valueToValidate;
+                } else
+                    valueToValidate = elementProperties.value.trim();
+
+                valueToValidate = this.checkNull(valueToValidate);
+            } catch (e) {}
+            elementVisible = (elementProperties.style.display.toLowerCase() === "none") ? false : true;
+        } else {
+            $spcontext.debugHandler("1112", "", "", "");
         }
-        catch (e) { }
-        elementVisible = (elementProperties.style.display.toLowerCase() === "none") ? false : true;
-    }
-    else {
+
+
+    } else {
         valueToValidate = this.checkNull(elementObj.staticValue);
         elementType = elementObj.elementType;
     }
 
     //===============================================================
-    var passValidation = this.validationProperties[elementType].validate(valueToValidate, elementObj.extension);
+    var passValidation = this.validationProperties[elementType].validate(valueToValidate, elementObj.extension, elementObj.id);
     if (!passValidation && elementVisible)
         this.validationReturn(elementObj.id, elementObj.msg, elementObj.addErrors, elementObj.triggerCallback);
     else if (passValidation && elementObj.removeHtmlErrors) {
         $("#" + elementObj.id).siblings(".temp-speedmsg").remove();
         $("#" + elementObj.id).removeClass("speedhtmlerr");
+        if (elementObj.elementType === "radio") {
+            var radioname = document.getElementById(elementObj.id).name;
+            $("input[name='" + radioname + "']").removeClass("speedhtmlerr");
+        }
     }
     if (elementObj.styleElement && !this.stylePlace) this.styleValidatedClass();
 };
@@ -401,16 +710,18 @@ Speed.prototype.clearValidation = function () {
  */
 Speed.prototype.styleValidatedClass = function (mystyle) {
     var styleDefinition = "<style>" +
-                            ".speedhtmlerr {border-style : solid !important;border-color:red !important;border-width:1px} " +
-                            "p.temp-speedmsg {color:red !important; font-weight:bold; margin:0}" +
-                         "</style>";
+        ".speedhtmlerr {border-style : solid !important;border-color:red !important;border-width:1px} " +
+        "p.temp-speedmsg {color:red !important; font-weight:bold; margin:0; padding: 0}" +
+        "input[type=checkbox].speedhtmlerr, input[type=radio].speedhtmlerr{outline: 2px solid red;}" +
+        "table.speedhtmlerr thead tr th {border-top: 2px solid red !important;border-bottom: 2px solid red !important; }" +
+        "table.speedhtmlerr thead tr th:first-child { border-left: 2px solid red!important; }" +
+        "table.speedhtmlerr thead tr th:last-child { border-right: 2px solid red!important; }" +
+        "</style>";
     if (!this.stylePlace) {
         if (typeof mystyle === 'undefined')
             $("head").append(styleDefinition);
         else {
-            //----- work on this later -------
-            var customStyles = "<style>.speedhtmlerr" + mystyle + " p.temp-speedmsg {color:red !important; font-weight:bold; margin:0}</style>";
-            $("head").append(customStyles);
+            $("head").append(mystyle);
         }
         this.stylePlace = true;
     }
@@ -424,8 +735,7 @@ Speed.prototype.styleValidatedClass = function (mystyle) {
 Speed.prototype.checkPassedValidation = function () {
     if (this.errors.length == 0) {
         return true;
-    }
-    else
+    } else
         return false;
 };
 
@@ -438,47 +748,207 @@ Speed.prototype.checkPassedValidation = function () {
  */
 //========================== SpeedPoint Binding Section =======================
 Speed.prototype.bind = function (listObjects, staticBind) {
+    speedPointContext = this;
     this.clearValidation();
-    var bindStaticFields = (typeof staticBind === 'undefined') ? true : staticBind;
+    //var bindStaticFields = (typeof staticBind === 'undefined') ? true : staticBind;
     var returnObject = {}
     if (typeof listObjects !== "undefined" && listObjects != null) {
         returnObject = listObjects;
     }
     //decides if u want to bind static fields to objects
     //set this option to false if the static fields already contains the same values with the object
-    
-    var element = document.querySelectorAll("[speed-bind]");
-    for (var i = 0; i <= (element.length - 1) ; i++) {
-        var property = element[i].getAttribute("speed-bind");
-        if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "select" || element[i].tagName.toLowerCase() == "textarea") {
-            if (element[i].type == "checkbox")
-                returnObject[property] = element[i].checked;
-            else
-                returnObject[property] = element[i].value;
-        }
-        else if(!bindStaticFields && element[i].tagName.toLowerCase() == "label"){
-            //dont reterive values from labels if static bind is turned off
-        }
-        else
-            returnObject[property] = element[i].innerText;
-    }
 
+    var element = document.querySelectorAll("[speed-bind]");
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var property = element[i].getAttribute("speed-bind");
+        var omitControl = (element[i].getAttribute("speed-as-static") === null) ? false : (element[i].getAttribute("speed-as-static").toLowerCase() === "true");
+        if (!omitControl) {
+            if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "select" || element[i].tagName.toLowerCase() == "textarea") {
+                if (element[i].type == "checkbox") {
+                    var multivalue = (element[i].getAttribute("sptype") === null) ? false : (element[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var jsonlabel = (element[i].getAttribute("spjsonlabel") === null) ? false : (element[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify([]);
+                        }
+                        var propertyValues = JSON.parse(returnObject[property]);
+
+                        var checkvalue = {
+                            label: (jsonlabel) ? JSON.parse(element[i].getAttribute("sptype-label")) : element[i].getAttribute("sptype-label"),
+                            value: element[i].checked
+                        }
+                        propertyValues.push(checkvalue);
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        returnObject[property] = element[i].checked;
+                    }
+                } else if (element[i].type == "radio") {
+                    var multivalue = (element[i].getAttribute("sptype") === null) ? false : (element[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var name = (element[i].getAttribute("name") === null) ? "" : element[i].getAttribute("name");
+                    var jsonlabel = (element[i].getAttribute("spjsonlabel") === null) ? false : (element[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    var overidevalidation = (element[i].getAttribute("sptype-overide-validation") === null) ? false : (element[i].getAttribute("sptype-overide-validation").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (overidevalidation) {
+                            validationtype = "multivalue";
+                        }
+
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify({});
+                        }
+
+                        var propertyValues = JSON.parse(returnObject[property]);
+                        returnObject[property] = $("input[name='" + name + "']:checked").val();
+
+                        var setProperty = element[i].getAttribute("sptype-label");
+                        propertyValues[setProperty] = returnObject[property];
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        returnObject[property] = $("input[name='" + name + "']:checked").val();
+                    }
+                } else {
+                    var multivalue = (element[i].getAttribute("sptype") === null) ? false : (element[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var jsonlabel = (element[i].getAttribute("spjsonlabel") === null) ? false : (element[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify({});
+                        }
+                        var propertyValues = JSON.parse(returnObject[property]);
+
+                        var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                        if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                            returnObject[property] = element[i].value;
+                        } else {
+                            var rawValue = (element[i].getAttribute("speed-currency-numeric") === null) ? false : (element[i].getAttribute("speed-currency-numeric").toLowerCase() === "true");
+                            returnObject[property] = speedPointContext.stripCurrencyToNumber(element[i].value, currencyUsed, rawValue)
+                        }
+
+                        /*var checkvalue = {
+                            label: (jsonlabel) ? JSON.parse(element[i].getAttribute("sptype-label")) : element[i].getAttribute("sptype-label"),
+                            value: returnObject[property]
+                        }*/
+                        var setProperty = element[i].getAttribute("sptype-label");
+                        propertyValues[setProperty] = returnObject[property];
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                        if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                            returnObject[property] = element[i].value;
+                        } else {
+                            var rawValue = (element[i].getAttribute("speed-currency-numeric") === null) ? false : (element[i].getAttribute("speed-currency-numeric").toLowerCase() === "true");
+                            returnObject[property] = speedPointContext.stripCurrencyToNumber(element[i].value, currencyUsed, rawValue)
+                        }
+                    }
+
+                }
+            } else
+                returnObject[property] = element[i].innerText;
+        }
+    }
 
     //Speed bind and validate html
     var elementValidate = document.querySelectorAll("[speed-bind-validate]");
-    for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
+    for (var i = 0; i <= (elementValidate.length - 1); i++) {
         var property = elementValidate[i].getAttribute("speed-bind-validate");
         var msg = elementValidate[i].getAttribute("speed-validate-msg");
+        var onValidation = (elementValidate[i].getAttribute("speed-validate-mode") === null) ? true : (elementValidate[i].getAttribute("speed-validate-mode") === "true");
         var inputtype = elementValidate[i].getAttribute("speed-validate-type");
         var inputid = elementValidate[i].getAttribute("id");
         var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
         var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
+        var omitControl = (elementValidate[i].getAttribute("speed-as-static") === null) ? false : (elementValidate[i].getAttribute("speed-as-static").toLowerCase() === "true");
+
         if (elementValidate[i].tagName.toLowerCase() == "input" || elementValidate[i].tagName.toLowerCase() == "select" || elementValidate[i].tagName.toLowerCase() == "textarea") {
-            if (elementValidate[i].type == "checkbox")
-                returnObject[property] = elementValidate[i].checked;
-            else
-                returnObject[property] = elementValidate[i].value;
-            this.validateField({ id: inputid, msg: validationMessage, extension: validationtype });
+            if (!omitControl) {
+                if (elementValidate[i].type == "checkbox") {
+                    var multivalue = (elementValidate[i].getAttribute("sptype") === null) ? false : (elementValidate[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var jsonlabel = (elementValidate[i].getAttribute("spjsonlabel") === null) ? false : (elementValidate[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    var overidevalidation = (elementValidate[i].getAttribute("sptype-overide-validation") === null) ? true : (elementValidate[i].getAttribute("sptype-overide-validation").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (overidevalidation) {
+                            validationtype = "multivalue";
+                        }
+
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify([]);
+                        }
+                        var propertyValues = JSON.parse(returnObject[property]);
+
+                        var checkvalue = {
+                            label: (jsonlabel) ? JSON.parse(elementValidate[i].getAttribute("sptype-label")) : elementValidate[i].getAttribute("sptype-label"),
+                            value: elementValidate[i].checked
+                        }
+                        propertyValues.push(checkvalue);
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        returnObject[property] = elementValidate[i].checked;
+                    }
+                } else if (elementValidate[i].type == "radio") {
+                    var multivalue = (elementValidate[i].getAttribute("sptype") === null) ? false : (elementValidate[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var name = (elementValidate[i].getAttribute("name") === null) ? "" : elementValidate[i].getAttribute("name");
+                    var jsonlabel = (elementValidate[i].getAttribute("spjsonlabel") === null) ? false : (elementValidate[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    var overidevalidation = (elementValidate[i].getAttribute("sptype-overide-validation") === null) ? false : (elementValidate[i].getAttribute("sptype-overide-validation").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (overidevalidation) {
+                            validationtype = "multivalue";
+                        }
+
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify({});
+                        }
+
+                        var propertyValues = JSON.parse(returnObject[property]);
+                        returnObject[property] = $("input[name='" + name + "']:checked").val();
+
+                        var setProperty = elementValidate[i].getAttribute("sptype-label");
+                        propertyValues[setProperty] = returnObject[property];
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        returnObject[property] = $("input[name='" + name + "']:checked").val();
+                    }
+                } else {
+                    var multivalue = (elementValidate[i].getAttribute("sptype") === null) ? false : (elementValidate[i].getAttribute("sptype").toLowerCase() === "multivalue");
+                    var jsonlabel = (elementValidate[i].getAttribute("spjsonlabel") === null) ? false : (elementValidate[i].getAttribute("spjsonlabel").toLowerCase() === "true");
+                    var overidevalidation = (elementValidate[i].getAttribute("sptype-overide-validation") === null) ? false : (elementValidate[i].getAttribute("sptype-overide-validation").toLowerCase() === "true");
+                    if (multivalue) {
+                        if (overidevalidation) {
+                            validationtype = "multivalue";
+                        }
+
+                        if (typeof returnObject[property] === "undefined") {
+                            returnObject[property] = JSON.stringify({});
+                        }
+                        var propertyValues = JSON.parse(returnObject[property]);
+
+                        var currencyUsed = elementValidate[i].getAttribute("speed-bind-currency");
+                        if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                            returnObject[property] = elementValidate[i].value;
+                        } else {
+                            var rawValue = (elementValidate[i].getAttribute("speed-currency-numeric") === null) ? false : (elementValidate[i].getAttribute("speed-currency-numeric").toLowerCase() === "true");
+                            returnObject[property] = speedPointContext.stripCurrencyToNumber(elementValidate[i].value, currencyUsed, rawValue)
+                        }
+
+                        var setProperty = elementValidate[i].getAttribute("sptype-label");
+                        propertyValues[setProperty] = returnObject[property];
+                        returnObject[property] = JSON.stringify(propertyValues);
+                    } else {
+                        var currencyUsed = elementValidate[i].getAttribute("speed-bind-currency");
+                        if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                            returnObject[property] = elementValidate[i].value;
+                        } else {
+                            var rawValue = (elementValidate[i].getAttribute("speed-currency-numeric") === null) ? false : (elementValidate[i].getAttribute("speed-currency-numeric").toLowerCase() === "true");
+                            returnObject[property] = speedPointContext.stripCurrencyToNumber(elementValidate[i].value, currencyUsed, rawValue)
+                        }
+                    }
+
+                }
+            }
+            if (onValidation) {
+                this.validateField({
+                    id: inputid,
+                    msg: validationMessage,
+                    extension: validationtype
+                });
+            }
         }
     }
 
@@ -488,10 +958,10 @@ Speed.prototype.bind = function (listObjects, staticBind) {
         var property = elementPeople[i].getAttribute("speed-bind-people");
         var msg = elementPeople[i].getAttribute("speed-validate-msg");
 
-        var useJson = (elementPeople[i].getAttribute("speed-people-JSON") !== null) ? (elementPeople[i].getAttribute("speed-people-JSON").toLowerCase() === "true") : false;
+        var useJson = (elementPeople[i].getAttribute("speed-JSON") !== null) ? (elementPeople[i].getAttribute("speed-JSON").toLowerCase() === "true") : false;
 
         var validate = (elementPeople[i].getAttribute("speed-people-validate") !== null) ? (elementPeople[i].getAttribute("speed-people-validate").toLowerCase() === "true") : false;
-
+        var omitControl = (elementPeople[i].getAttribute("speed-as-static") === null) ? false : (elementPeople[i].getAttribute("speed-as-static").toLowerCase() === "true");
         var inputid = elementPeople[i].getAttribute("id");
         var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
         var validationtype = "text";
@@ -503,43 +973,69 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             if (userObject !== null) {
                 if (userObject.length !== 0) {
                     if (useJson) {
-                        returnObject[property] = userObject;
-                    }
-                    else {
-                        if (userObject.length == 1)
-                            returnObject[property] = SP.FieldUserValue.fromUser(userObject[0].Key);
-                        else {
+                        if (!omitControl) {
+                            returnObject[property] = JSON.stringify(userObject);
+                        }
+                    } else {
+                        if (userObject.length == 1) {
+                            if (!omitControl) {
+                                returnObject[property] = SP.FieldUserValue.fromUser(userObject[0].Key);
+                            }
+                        } else {
                             if (peopleDict.AllowMultipleUsers) {
                                 var tempArray = [];
-                                for (var a = 0; a <= (userObject.length -1); a++) {
+                                for (var a = 0; a <= (userObject.length - 1); a++) {
                                     tempArray.push(SP.FieldUserValue.fromUser(userObject[a].Key));
                                 }
-                                returnObject[property] = tempArray;
-                            }
-                            else {
-                                returnObject[property] = null;
+                                if (!omitControl)
+                                    returnObject[property] = tempArray;
+                            } else {
+                                if (!omitControl) {
+                                    returnObject[property] = null;
+                                }
                                 if (validate)
-                                    this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+                                    this.validateField({
+                                        id: pickerID,
+                                        staticValue: "",
+                                        msg: validationMessage,
+                                        elementType: "text",
+                                        useElementProperties: false
+                                    });
                             }
                         }
                     }
-                }
-                else {
-                    returnObject[property] = null;
+                } else {
+                    if (!omitControl) {
+                        returnObject[property] = null;
+                    }
                     if (validate)
-                        this.validateField({ id: pickerID, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
+                        this.validateField({
+                            id: pickerID,
+                            staticValue: "",
+                            msg: validationMessage,
+                            elementType: "text",
+                            useElementProperties: false
+                        });
                 }
             }
-               
+
         }
     }
 
     //Speed bind and table to array
     var elementValidate = document.querySelectorAll("[speed-bind-table]");
-    for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
+    for (var i = 0; i <= (elementValidate.length - 1); i++) {
         var property = elementValidate[i].getAttribute("speed-bind-table");
-        var strignify = (elementValidate[i].getAttribute("speed-people-JSON") !== null) ? (elementValidate[i].getAttribute("speed-people-JSON").toLowerCase() === "true") : true;
+        var strignify = (elementValidate[i].getAttribute("speed-JSON") !== null) ? (elementValidate[i].getAttribute("speed-JSON").toLowerCase() === "true") : true;
         var inputid = elementValidate[i].getAttribute("id");
+
+        var omitControl = (elementValidate[i].getAttribute("speed-as-static") === null) ? false : (elementValidate[i].getAttribute("speed-as-static").toLowerCase() === "true");
+
+        var validate = (elementValidate[i].getAttribute("speed-table-validate") === null) ? true : (elementValidate[i].getAttribute("speed-table-validate").toLowerCase() === "true");
+        var msg = elementValidate[i].getAttribute("speed-validate-msg");
+        var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please enter a data" : msg;
+        var fieldVisible = (elementValidate[i].style.display.toLowerCase() === "none") ? false : true;
+
         var objproperties = [];
         $("#" + inputid + " > thead > tr > th").each(function () {
             if (this.getAttribute("speed-array-prop") !== null)
@@ -558,10 +1054,17 @@ Speed.prototype.bind = function (listObjects, staticBind) {
                     if (inputTag.tagName.toLowerCase() == "input" || inputTag.tagName.toLowerCase() == "select" || inputTag.tagName.toLowerCase() == "textarea") {
                         if (inputTag.type == "checkbox")
                             objValue[objproperties[objCount]] = inputTag.checked;
-                        else
-                            objValue[objproperties[objCount]] = inputTag.value;
-                    }
-                    else
+                        else {
+                            //objValue[objproperties[objCount]] = inputTag.value;
+                            var currencyUsed = inputTag.getAttribute("speed-bind-currency");
+                            if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                                objValue[objproperties[objCount]] = inputTag.value;
+                            } else {
+                                var rawValue = (inputTag.getAttribute("speed-currency-numeric") === null) ? false : (inputTag.getAttribute("speed-currency-numeric").toLowerCase() === "true");
+                                objValue[objproperties[objCount]] = speedPointContext.stripCurrencyToNumber(inputTag.value, currencyUsed, rawValue);
+                            }
+                        }
+                    } else
                         objValue[objproperties[objCount]] = inputTag.innerText;
 
                     objCount++;
@@ -569,20 +1072,103 @@ Speed.prototype.bind = function (listObjects, staticBind) {
             });
             arrayValue.push(objValue);
         });
-        if (strignify)
-            returnObject[property] = JSON.stringify(arrayValue);
-        else
-        returnObject[property] = arrayValue;
+
+        if (validate && fieldVisible && arrayValue.length === 0 && !omitControl) {
+            this.validateField({
+                id: inputid,
+                staticValue: "",
+                msg: validationMessage,
+                elementType: "text",
+                useElementProperties: false
+            });
+        }
+
+        if (strignify) {
+            if (!omitControl) {
+                returnObject[property] = JSON.stringify(arrayValue);
+            }
+        } else {
+            if (!omitControl) {
+                returnObject[property] = arrayValue;
+            }
+        }
+    }
+
+    var element = document.querySelectorAll("[speed-file-validate]");
+
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var property = element[i].getAttribute("speed-file-validate");
+        var inputid = element[i].id;
+        var msg = element[i].getAttribute("speed-validate-msg");
+        var onValidation = (element[i].getAttribute("speed-validate-mode") === null) ? true : (element[i].getAttribute("speed-validate-mode") === "true");
+        var validationMessage = (msg == null || msg == "" || typeof msg == "undefined") ? "Please select a file" : msg;
+        var fieldNotVisible = (element[i].style.display.toLowerCase() === "none");
+        if (typeof this.filesDictionary[property] === "undefined" && !fieldNotVisible && onValidation) {
+            this.validateField({
+                id: inputid,
+                staticValue: "",
+                msg: validationMessage,
+                elementType: "text",
+                useElementProperties: false
+            });
+        } else if (typeof this.filesDictionary[property] !== "undefined") {
+            if (this.filesDictionary[property].length === 0 && !fieldNotVisible && onValidation) {
+                this.validateField({
+                    id: inputid,
+                    staticValue: "",
+                    msg: validationMessage,
+                    elementType: "text",
+                    useElementProperties: false
+                });
+            }
+        }
     }
 
     return returnObject;
 }
 
 /**
+ * The getAttachmentControls function gets all speed-bind & speed-bind-validate html attributes names
+ * @returns {Array} the Array return contains all controls names
+ */
+Speed.prototype.getAttachmentControls = function () {
+    var returnArr = [];
+
+    var element = document.querySelectorAll("[speed-file-bind]");
+
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var elementProp = {};
+        elementProp.property = element[i].getAttribute("speed-file-bind");
+        elementProp.id = element[i].id;
+        elementProp.type = (element[i].getAttribute("type") === null) ? "" : element[i].getAttribute("type").toLowerCase();
+        var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+        if (includeControl) {
+            returnArr.push(elementProp);
+        }
+    }
+
+    var element = document.querySelectorAll("[speed-file-validate]");
+
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var elementProp = {};
+        elementProp.property = element[i].getAttribute("speed-file-validate");
+        elementProp.id = element[i].id;
+        elementProp.type = (element[i].getAttribute("type") === null) ? "" : element[i].getAttribute("type").toLowerCase();
+        var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+        if (includeControl) {
+            returnArr.push(elementProp);
+        }
+    }
+
+    return returnArr;
+};
+
+/**
  * The getControls function gets all speed-bind & speed-bind-validate html attributes names
  * @returns {Array} the Array return contains all controls names
  */
-Speed.prototype.getControls = function (onlyTables) {
+Speed.prototype.getControls = function (onlyTables, tableGroupId) {
+    var speedContext = this;
     var onlyTables = (typeof onlyTables === "undefined") ? false : onlyTables;
     var returnArr = [];
 
@@ -590,13 +1176,44 @@ Speed.prototype.getControls = function (onlyTables) {
         //decides if u want to bind static fields to objects
         //set this option to false if the static fields already contains the same values with the object
         var element = document.querySelectorAll("[speed-bind]");
-        
+        var includeProperties = (typeof tableGroupId !== "undefined" && typeof tableGroupId === "boolean") ? tableGroupId : false;
+
         for (var i = 0; i <= (element.length - 1); i++) {
             var property = element[i].getAttribute("speed-bind");
             var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
-            if (includeControl) {
-                if ($.inArray(property, returnArr) < 0)
-                    returnArr.push(property);
+            if (includeControl && property !== "") {
+                if ($.inArray(property, returnArr) < 0) {
+                    if (!includeProperties) {
+                        returnArr.push(property);
+                    } else {
+                        var SPElementProperties = {};
+                        SPElementProperties.columnName = property;
+                        if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "select" || element[i].tagName.toLowerCase() == "label") {
+                            var elementtype = element[i].getAttribute("[sptype]");
+                            try {
+                                elementtype = elementtype.toLowerCase();
+                            } catch (e) {}
+                            if (elementtype !== "date") {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Text\" />";
+                                SPElementProperties.fieldType = SP.FieldText;
+                            } else if (elementtype !== "multivalue") {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Note\" RichText=\"FALSE\" />";
+                                SPElementProperties.fieldType = SP.FieldText;
+                            } else {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"DateTime\" />";
+                                SPElementProperties.fieldType = SP.FieldDateTime;
+                            }
+                        } else if (element[i].tagName.toLowerCase() == "textarea") {
+                            SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Note\" RichText=\"FALSE\" />";
+                            SPElementProperties.fieldType = SP.FieldText;
+                        }
+
+                        SPElementProperties.fieldOptions = SP.AddFieldOptions.defaultValue;
+                        SPElementProperties.addToDefault = true;
+
+                        returnArr.push(SPElementProperties);
+                    }
+                }
             }
         }
 
@@ -605,9 +1222,39 @@ Speed.prototype.getControls = function (onlyTables) {
         for (var i = 0; i <= (elementValidate.length - 1); i++) {
             var property = elementValidate[i].getAttribute("speed-bind-validate");
             var includeControl = (elementValidate[i].getAttribute("speed-include-control") === null) ? true : (elementValidate[i].getAttribute("speed-include-control").toLowerCase() === "true");
-            if (includeControl) {
-                if ($.inArray(property, returnArr) < 0)
-                    returnArr.push(property);
+            if (includeControl && property !== "") {
+                if ($.inArray(property, returnArr) < 0) {
+                    if (!includeProperties) {
+                        returnArr.push(property);
+                    } else {
+                        var SPElementProperties = {};
+                        SPElementProperties.columnName = property;
+                        if (elementValidate[i].tagName.toLowerCase() == "input" || elementValidate[i].tagName.toLowerCase() == "select" || elementValidate[i].tagName.toLowerCase() == "label") {
+                            var elementtype = elementValidate[i].getAttribute("sptype");
+                            try {
+                                elementtype = elementtype.toLowerCase();
+                            } catch (e) {}
+                            if (elementtype !== "date") {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Text\" />";
+                                SPElementProperties.fieldType = SP.FieldText;
+                            } else if (elementtype !== "multivalue") {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Note\" RichText=\"FALSE\" />";
+                                SPElementProperties.fieldType = SP.FieldText;
+                            } else {
+                                SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"DateTime\" />";
+                                SPElementProperties.fieldType = SP.FieldDateTime;
+                            }
+                        } else if (elementValidate[i].tagName.toLowerCase() == "textarea") {
+                            SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Note\" RichText=\"FALSE\" />";
+                            SPElementProperties.fieldType = SP.FieldMultiLineText;
+                        }
+
+                        SPElementProperties.fieldOptions = SP.AddFieldOptions.defaultValue;
+                        SPElementProperties.addToDefault = true;
+
+                        returnArr.push(SPElementProperties);
+                    }
+                }
             }
         }
 
@@ -616,21 +1263,101 @@ Speed.prototype.getControls = function (onlyTables) {
         for (var i = 0; i <= (elementPeople.length - 1); i++) {
             var property = elementPeople[i].getAttribute("speed-bind-people");
             var includeControl = (elementPeople[i].getAttribute("speed-include-control") === null) ? true : (elementPeople[i].getAttribute("speed-include-control").toLowerCase() === "true");
-            if (includeControl) {
-                if ($.inArray(property, returnArr) < 0)
+            if (includeControl && property !== "") {
+                if ($.inArray(property, returnArr) < 0) {
+                    if (!includeProperties) {
+                        returnArr.push(property);
+                    } else {
+                        var SPElementProperties = {};
+                        SPElementProperties.columnName = property;
+                        SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"UserMulti\" UserSelectionMode=\"PeopleAndGroups\" Mult=\"TRUE\" />";
+                        SPElementProperties.fieldType = SP.FieldUser;
+                        SPElementProperties.fieldOptions = SP.AddFieldOptions.defaultValue;
+                        SPElementProperties.addToDefault = true;
+
+                        returnArr.push(SPElementProperties);
+                    }
+                }
+            }
+        }
+
+        //Speed bind table assests
+        var element = document.querySelectorAll("[speed-bind-table]");
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var property = element[i].getAttribute("speed-bind-table");
+            var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl && property !== "") {
+                if ($.inArray(property, returnArr) < 0) {
+                    if (!includeProperties) {
+                        returnArr.push(property);
+                    } else {
+                        var SPElementProperties = {};
+                        SPElementProperties.ColumnName = property;
+                        SPElementProperties.columnField = "<Field DisplayName=\"" + property + "\" Type=\"Note\" RichText=\"FALSE\" />";
+                        SPElementProperties.fieldType = SP.FieldMultiLineText;
+                        SPElementProperties.fieldOptions = SP.AddFieldOptions.defaultValue;
+                        SPElementProperties.addToDefault = true;
+                        returnArr.push(SPElementProperties);
+                    }
+                }
+            }
+        }
+
+        var element = document.querySelectorAll("[speed-MulitCheck-bind]");
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var property = element[i].getAttribute("speed-MulitCheck-bind");
+            var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            if (includeControl && property !== "") {
+                if ($.inArray(property, returnArr) < 0) {
                     returnArr.push(property);
+                }
             }
         }
     }
 
-    if(onlyTables){
+    if (onlyTables) {
         var element = document.querySelectorAll("[speed-table-data]");
-        for (var i = 0; i <= (element.length - 1) ; i++) {
+        for (var i = 0; i <= (element.length - 1); i++) {
             var property = element[i].getAttribute("speed-table-data");
-            var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
-            if (includeControl) {
+            //table group is used to split the Table controls if multiple tables are used
+            var tablegroup = element[i].getAttribute("speed-table-group");
+            //var includeControl = (element[i].getAttribute("speed-include-control") === null) ? true : (element[i].getAttribute("speed-include-control").toLowerCase() === "true");
+            var includeControl = (typeof tableGroupId === "undefined" || tableGroupId === "") ? true : (tablegroup === tableGroupId);
+            if (includeControl && property !== "") {
                 if ($.inArray(property, returnArr) < 0)
                     returnArr.push(property);
+
+                //attach event listener on Table Click
+                var elementEventData = speedContext.DataForTable.tdClick[property];
+                if (typeof elementEventData === "undefined") {
+                    speedContext.DataForTable.tdClick[property] = false;
+                    element[i].addEventListener("click", function (evt) {
+                        var mainProperty = evt.srcElement.getAttribute("speed-table-data");
+                        speedContext.DataForTable.tdClick[mainProperty] = (speedContext.DataForTable.tdClick[mainProperty]) ? false : true;
+
+                        speedContext.DataForTable.tabledata.sort(function (a, b) {
+                            if (speedContext.DataForTable.tdClick[mainProperty]) {
+                                if (a[mainProperty] < b[mainProperty]) {
+                                    return -1;
+                                }
+                                if (a[mainProperty] > b[mainProperty]) {
+                                    return 1;
+                                }
+                                return 0;
+                            } else {
+                                if (a[mainProperty] > b[mainProperty]) {
+                                    return -1;
+                                }
+                                if (a[mainProperty] < b[mainProperty]) {
+                                    return 1;
+                                }
+                                return 0;
+                            }
+                        });
+
+                        speedContext.manualTable(speedContext.DataForTable.tabledata);
+                    });
+                }
             }
         }
     }
@@ -642,64 +1369,305 @@ Speed.prototype.getControls = function (onlyTables) {
  * @param {object} listObjects this parameter provides the value for the attriutes
  */
 Speed.prototype.htmlBind = function (listObjects) {
+    var speedContext = this;
     for (var key in listObjects) {
         if (listObjects.hasOwnProperty(key)) {
             var element = document.querySelectorAll("[speed-bind='" + key + "']");
             if (element.length > 0) {
-                for (var i = 0; i <= (element.length - 1) ; i++) {
+                for (var i = 0; i <= (element.length - 1); i++) {
                     var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
                     if (useAutoBinding) {
                         if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
-                            if (element[i].type !== "checkbox")
-                                element[i].value = listObjects[key];
-                            else
-                                element[i].checked = listObjects[key];
-                        }
-                        else if (element[i].tagName.toLowerCase() == "select") {
+                            if (element[i].type === "radio") {
+                                if (listObjects[key] !== "")
+                                    $("input:radio[name='" + element[i].name + "'][value='" + listObjects[key] + "']").prop('checked', true);
+                            } else if (element[i].type !== "checkbox") {
+                                var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                                if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                                    element[i].value = listObjects[key];
+                                } else {
+                                    element[i].value = currencyUsed + speedContext.numberWithCommas(listObjects[key]);
+                                }
+                            } else {
+                                if (typeof listObjects[key] === "string") {
+                                    if (listObjects[key] !== "")
+                                        element[i].checked = (listObjects[key].toLowerCase() === "true");
+                                } else {
+                                    element[i].checked = listObjects[key];
+                                }
+                            }
+                        } else if (element[i].tagName.toLowerCase() == "select") {
                             $("#" + element[i].id).val(listObjects[key]);
+                        } else {
+                            var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                            if (typeof currencyUsed === "undefined" || currencyUsed == null) {
+                                element[i].innerHTML = listObjects[key];
+                            } else {
+                                element[i].innerHTML = currencyUsed + speedContext.numberWithCommas(listObjects[key]);
+                            }
                         }
-                        else
-                            element[i].innerHTML = listObjects[key];
+
                     }
                 }
             }
-            else {
-                element = document.querySelectorAll("[speed-bind-validate='" + key + "']");
-                if (element.length > 0) {
-                    for (var i = 0; i <= (element.length - 1); i++) {
-                        var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
-                        if (useAutoBinding) {
-                            if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
-                                if (element[i].type !== "checkbox")
+
+            //bind validated fields
+            element = document.querySelectorAll("[speed-bind-validate='" + key + "']");
+            if (element.length > 0) {
+                for (var i = 0; i <= (element.length - 1); i++) {
+                    var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                    if (useAutoBinding) {
+                        if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
+                            if (element[i].type === "radio") {
+                                if (listObjects[key] !== "")
+                                    $("input:radio[name='" + element[i].name + "'][value='" + listObjects[key] + "']").prop('checked', true);
+                            } else if (element[i].type !== "checkbox") {
+                                var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                                if (typeof currencyUsed === "undefined" || currencyUsed == null) {
                                     element[i].value = listObjects[key];
-                                else
+                                } else {
+                                    element[i].value = currencyUsed + speedContext.numberWithCommas(listObjects[key]);
+                                }
+                            } else {
+                                if (typeof listObjects[key] === "string") {
+                                    if (listObjects[key] !== "")
+                                        element[i].checked = (listObjects[key].toLowerCase() === "true");
+                                } else {
                                     element[i].checked = listObjects[key];
+                                }
                             }
-                            else if (element[i].tagName.toLowerCase() == "select") {
-                                $("#" + element[i].id).val(listObjects[key]);
-                            }
-                            else
+                        } else if (element[i].tagName.toLowerCase() == "select") {
+                            $("#" + element[i].id).val(listObjects[key]);
+                        } else {
+                            var currencyUsed = element[i].getAttribute("speed-bind-currency");
+                            if (typeof currencyUsed === "undefined" || currencyUsed == null) {
                                 element[i].innerHTML = listObjects[key];
+                            } else {
+                                element[i].innerHTML = currencyUsed + speedContext.numberWithCommas(listObjects[key]);
+                            }
                         }
                     }
                 }
-                else {
-                    element = document.querySelectorAll("[speed-bind-people='" + key + "']");
-                    if (element.length > 0) {
-                        for (var i = 0; i <= (element.length - 1); i++) {
-                            var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
-                            if (useAutoBinding) {
-                                if ($.type(listObjects[key]) === "object") {
-                                    element[i].innerHTML = "<p>" + listObjects[key].value + "</p>"; 
+            }
+
+            //bind people fields
+            element = document.querySelectorAll("[speed-bind-people='" + key + "']");
+            if (element.length > 0) {
+                for (var i = 0; i <= (element.length - 1); i++) {
+                    var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                    var SPbind = (element[i].getAttribute("speed-bind-topicker") !== null) ? (element[i].getAttribute("speed-bind-topicker").toLowerCase() === "true") : false;
+                    if (useAutoBinding) {
+                        var pickerID = element[i].id + '_TopSpan';
+                        var pickerDefined = typeof SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID] !== "undefined";
+                        var hasEmailProperty = false;
+                        if ($.type(listObjects[key]) === "object") {
+                            hasEmailProperty = (typeof listObjects[key].email !== "undefined");
+                        } else if ($.type(listObjects[key]) === "array") {
+                            hasEmailProperty = (typeof listObjects[key][0].email !== "undefined");
+                        }
+
+                        if (!SPbind || !pickerDefined) {
+                            var hasValidate = (element[i].getAttribute("speed-people-validate") !== null) ? (element[i].getAttribute("speed-people-validate").toLowerCase() === "true") : false;
+                            if (hasValidate) {
+                                element[i].setAttribute("speed-people-validate", false);
+                            }
+
+                            if ($.type(listObjects[key]) === "object") {
+                                element[i].innerHTML = "<p>" + listObjects[key].value + "</p>";
+                            } else if ($.type(listObjects[key]) === "array") {
+                                var str = "";
+                                for (z = 0; z < listObjects[key].length; z++) {
+                                    str += "<p>" + listObjects[key][z].value + "</p>";
                                 }
-                                else {
-                                    var str = "";
-                                    for (z = 0; z < listObjects[key].length; z++) {
-                                        str += "<p>" + listObjects[key][z].value + "</p>";
-                                    }
-                                    element[i].innerHTML = str;
+                                element[i].innerHTML = str;
+                            }
+                        } else if (hasEmailProperty) {
+                            var pickerObject = SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID];
+                            if ($.type(listObjects[key]) === "object") {
+                                $spcontext.setPeoplePickerValue(pickerObject, listObjects[key].email);
+                            } else if ($.type(listObjects[key]) === "array") {
+                                for (z = 0; z < listObjects[key].length; z++) {
+                                    $spcontext.setPeoplePickerValue(pickerObject, listObjects[key][z].email);
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            //bind Table
+            var element = document.querySelectorAll("[speed-bind-table='" + key + "']");
+            for (var i = 0; i <= (element.length - 1); i++) {
+
+                var inputid = element[i].getAttribute("id");
+                var parse = (element[i].getAttribute("speed-data-type") == "JSON") ? true : false;
+                var useSerialNo = (element[i].getAttribute("speed-serialno") !== null) ? (element[i].getAttribute("speed-serialno").toLowerCase() === "true") : false;
+                var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+                if (useAutoBinding) {
+                    var columnValue = [];
+
+                    var colproperties = [];
+                    $("#" + inputid + " > thead > tr > th").each(function () {
+                        if (this.getAttribute("speed-array-prop") !== null)
+                            colproperties.push(this.getAttribute("speed-array-prop"));
+                    });
+
+                    if (parse) {
+                        columnValue = speedContext.JSONToObject(listObjects[key]);
+                    } else {
+                        columnValue = listObjects[key];
+                    }
+
+                    for (var x = 0; x <= (columnValue.length - 1); x++) {
+                        var str = "<tr id='spbindtr" + x + "'>";
+                        if (useSerialNo) str += "<td><label class='speed-serialno'>" + (x + 1) + "</label></td>";
+                        for (var y = 0; y < colproperties.length; y++) {
+                            str += "<td><label class='speed-table-include'>" + columnValue[x][colproperties[y]] + "</label></td>";
+                        }
+                        str += "</tr>";
+                        $("#" + inputid + " > tbody").append(str);
+                    }
+                }
+
+            }
+
+            var element = document.querySelectorAll("[speed-MulitCheck-bind='" + key + "']");
+            for (var i = 0; i <= (element.length - 1); i++) {
+                var checkValues = speedContext.JSONToObject(listObjects[key]);
+                var elementProp = {};
+                elementProp.property = element[i].getAttribute("speed-MulitCheck-bind");
+                elementProp.id = element[i].id;
+                if (element[i].tagName.toLowerCase() === "div" || element[i].tagName.toLowerCase() === "p") {
+                    if ($.type(checkValues) === "array") {
+                        //var multivalues = checkValues[elementProp.property];
+                        //if (typeof multivalues !== "undefined") {
+                        for (var x = 0; x < checkValues.length; x++) {
+                            var check = "";
+                            if (checkValues[x].value === "true" || checkValues[x].value) {
+                                check = "checked";
+                            }
+                            var str = "<label class='speed-multi-check'><input id='" + $spcontext.uniqueIdGenerator() + "' " +
+                                "type='checkbox' href='" + checkValues[x] + "' " + check + " sptype-label='" + checkValues[x].label + "'>" + checkValues[x].label + "</label>";
+                            $(element[i]).append(str);
+                        }
+                        //}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The resetBind function resets all speed-bind & speed-bind-validate html controls
+ */
+Speed.prototype.resetBind = function () {
+    var speedContext = this;
+    var element = document.querySelectorAll("[speed-bind]");
+    if (element.length > 0) {
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+            if (useAutoBinding) {
+                if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
+                    if (element[i].type !== "checkbox") {
+                        element[i].value = "";
+                    } else {
+                        element[i].checked = false;
+                    }
+                } else if (element[i].tagName.toLowerCase() == "select") {
+                    $("#" + element[i].id).val("");
+                } else
+                    element[i].innerHTML = "";
+            }
+        }
+    }
+
+    //bind validated fields
+    element = document.querySelectorAll("[speed-bind-validate]");
+    if (element.length > 0) {
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+            if (useAutoBinding) {
+                if (element[i].tagName.toLowerCase() == "input" || element[i].tagName.toLowerCase() == "textarea") {
+                    if (element[i].type !== "checkbox") {
+                        element[i].value = "";
+                    } else {
+                        element[i].checked = false;
+                    }
+                } else if (element[i].tagName.toLowerCase() == "select") {
+                    $("#" + element[i].id).val("");
+                } else
+                    element[i].innerHTML = "";
+            }
+        }
+    }
+
+    //bind people fields
+    element = document.querySelectorAll("[speed-bind-people]");
+    if (element.length > 0) {
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var useAutoBinding = (element[i].getAttribute("speed-bind-auto") !== null) ? (element[i].getAttribute("speed-bind-auto").toLowerCase() === "true") : true;
+            //var SPbind = (element[i].getAttribute("speed-bind-topicker") !== null) ? (element[i].getAttribute("speed-bind-topicker").toLowerCase() === "true") : false;
+            if (useAutoBinding) {
+                var pickerID = element[i].id + '_TopSpan';
+                var pickerDefined = typeof SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID] !== "undefined";
+
+                if (!pickerDefined) {
+                    element[i].innerHTML = "";
+                } else {
+                    var pickerObject = SPClientPeoplePicker.SPClientPeoplePickerDict[pickerID];
+                    $spcontext.clearPicker(pickerObject);
+                }
+            }
+        }
+    }
+
+    var element = document.querySelectorAll("[speed-file-bind]");
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var elementProp = {};
+        elementProp.property = element[i].getAttribute("speed-file-bind");
+        elementProp.name = (typeof element[i].getAttribute("speed-file-name") === null) ? elementProp.property : element[i].getAttribute("speed-file-name");
+        elementProp.id = element[i].id;
+        if (element[i].tagName.toLowerCase() === "div" || element[i].tagName.toLowerCase() === "p") {
+            $(element[i]).empty();
+        } else if (element[i].tagName.toLowerCase() === "input" && element[i].type.toLowerCase() === "file") {
+            speedContext.clearFileInput(elementProp.id);
+        }
+    }
+
+    var element = document.querySelectorAll("[speed-file-validate]");
+    for (var i = 0; i <= (element.length - 1); i++) {
+        var elementProp = {};
+        elementProp.property = element[i].getAttribute("speed-file-validate");
+        elementProp.name = (typeof element[i].getAttribute("speed-file-name") === null) ? elementProp.property : element[i].getAttribute("speed-file-name");
+        elementProp.id = element[i].id;
+        if (element[i].tagName.toLowerCase() === "input" && element[i].type.toLowerCase() === "file") {
+            speedContext.clearFileInput(elementProp.id);
+        }
+    }
+}
+
+Speed.prototype.attachmentLinkBind = function (attachments) {
+    if (!$.isEmptyObject(attachments)) {
+        var element = document.querySelectorAll("[speed-file-bind]");
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var elementProp = {};
+            elementProp.property = element[i].getAttribute("speed-file-bind");
+            elementProp.propertyname = (typeof element[i].getAttribute("speed-property-asname") === null) ? false : element[i].getAttribute("speed-property-asname");
+            elementProp.name = (typeof element[i].getAttribute("speed-file-name") === null) ? elementProp.property : element[i].getAttribute("speed-file-name");
+            elementProp.id = element[i].id;
+            if (element[i].tagName.toLowerCase() === "div" || element[i].tagName.toLowerCase() === "p") {
+                if ($.type(attachments) === "object") {
+                    var attachmentLinks = attachments[elementProp.property];
+                    if (typeof attachmentLinks !== "undefined") {
+                        for (var x = 0; x < attachmentLinks.length; x++) {
+                            var displayName = elementProp.name;
+                            if (!elementProp.propertyname) {
+                                var splitedLinks = attachmentLinks[x].split("/");
+                                var pos = splitedLinks.length - 1;
+                                displayName = splitedLinks[pos];
+                            }
+                            $(element[i]).append("<p class='speed-attachment'><a target='_blank' href='" + attachmentLinks[x] + "'>" + displayName + "</p>");
                         }
                     }
                 }
@@ -708,26 +1676,183 @@ Speed.prototype.htmlBind = function (listObjects) {
     }
 }
 
-//================= work in progress ============
-Speed.prototype.bindArrayToTable = function (listObjects,parse, tableProperties) {
-    var speedContext = this;
-    for (var key in listObjects) {
-        if (listObjects.hasOwnProperty(key)) {
-            var element = document.querySelectorAll("[speed-bind-table='" + key + "']");
-            for (var i = 0; i <= (element.length - 1) ; i++) {
-                var inputid = element[i].getAttribute("id");
-                var columnValue = [];
-                if (parse) {
-                    columnValue = JSON.parse(speedContext.formatStringJSON(listObjects[key]));
-                }
-                else {
-                    columnValue = listObjects[key];
+//Directly bind list to html select
+Speed.prototype.bindListDirectives = function (properties, onFailed, appContext) {
+    var spContext = this;
+    var element = document.querySelectorAll("[speed-list-repeat]");
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    //Array
+    var excemptList = (typeof properties["Except"] === 'undefined') ? [] : properties["Except"];
+    //string
+    var customquery = (typeof properties["SPQuery"] === 'undefined') ? this.camlBuilder() : properties["SPQuery"];
+    //boolean
+    var setEmptyOption = (typeof properties["EmptyOption"] === 'undefined') ? true : properties["EmptyOption"];
+
+    var columns = (typeof properties["Columns"] === 'undefined') ? [] : properties["Columns"];
+
+    if (element.length > 0) {
+        for (var i = 0; i <= (element.length - 1); i++) {
+            var listName = element[i].getAttribute("speed-list-repeat");
+            var MessageValidation = element[i].getAttribute("speed-validate-msg");
+            if (!spContext.htmlDictionary.hasOwnProperty(listName)) {
+
+                var fullString = "";
+                if (element[i].tagName.toLowerCase() === "select" || element[i].tagName.toLowerCase() === "div") {
+                    var elementNodeText = element[i].innerHTML.trim();
+                    columns = columns.concat(elementNodeText.stringExtractor());
+                    fullString = elementNodeText;
+                    if (typeof properties[listName] !== "undefined") {
+                        if ((typeof properties[listName].onchange !== "undefined")) {
+                            element[i].onchange = function (event) {
+                                var eventList = document.getElementById(this.id).getAttribute("speed-list-repeat");
+                                properties[eventList].onchange(event);
+                            }
+                        }
+                    }
                 }
 
-                for (var x = 0; x <= (columnValue.length - 1) ; x++) {
-                    var str = tableProperties(columnValue[x]);
-                    $("#" + inputid + " > tbody").append(str);
+                spContext.htmlDictionary[listName] = {
+                    id: element[i].id,
+                    tag: element[i].tagName.toLowerCase(),
+                    columnList: columns,
+                    text: fullString,
+                    autoLoad: true,
+                    customFunction: null,
+                    run: false,
+                    data: []
                 }
+
+                if (typeof properties[listName] !== "undefined") {
+                    spContext.htmlDictionary[listName].autoLoad = (typeof properties[listName].autoLoad == "undefined") ? true : properties[listName].autoLoad;
+                    spContext.htmlDictionary[listName].customFunction = (typeof properties[listName].customAfterLoadFunction == "undefined") ? null : properties[listName].customAfterLoadFunction;
+                    customquery = (typeof properties[listName].query == "undefined") ? customquery : properties[listName].query;
+                    columns = (typeof properties[listName].columns == "undefined") ? columns : columns.concat(properties[listName].columns);
+                }
+
+                var controlsDefinition = {
+                    merge: false,
+                    data: columns
+                }
+
+                //excempt list
+                if ($.inArray(listName, excemptList) < 0 && !spContext.htmlDictionary[listName].run) {
+
+                    $("#" + element[i].id).empty();
+                    if (typeof properties[listName] !== "undefined") {
+                        if (typeof properties[listName].customBeforeLoadFunction != "undefined" && typeof properties[listName].customBeforeLoadFunction == "function") {
+                            properties[listName].customBeforeLoadFunction();
+                        }
+                    }
+
+                    if (setEmptyOption) {
+                        if (MessageValidation == "" || typeof MessageValidation === "undefined" || MessageValidation == null) {
+                            $("#" + element[i].id).append("<option value=''>Please select a value</option>");
+                        } else {
+                            $("#" + element[i].id).append("<option value=''>" + MessageValidation + "</option>");
+                        }
+                    }
+
+                    spContext.getListToItems(listName, customquery, controlsDefinition, false, null, function (listElements, listNameFromQuery) {
+                        spContext.htmlDictionary[listNameFromQuery].data = listElements;
+                        if (spContext.htmlDictionary[listNameFromQuery].autoLoad) {
+                            for (var z = 0; z < listElements.length; z++) {
+                                for (var propName in listElements[z]) {
+                                    if (spContext.htmlDictionary[listNameFromQuery].tag === "select" || spContext.htmlDictionary[listNameFromQuery].tag === "div") {
+                                        var valueToAppend = spContext.htmlDictionary[listNameFromQuery].text;
+                                        var stringToFind = "{{" + propName + "}}";
+                                        if (valueToAppend.indexOf(stringToFind) >= 0) {
+                                            var regex = new RegExp(stringToFind, "g");
+                                            valueToAppend = valueToAppend.replace(regex, listElements[z][propName]);
+                                            $("#" + spContext.htmlDictionary[listNameFromQuery].id).append(valueToAppend);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (typeof spContext.htmlDictionary[listNameFromQuery].customFunction !== "undefined") {
+                            if (typeof spContext.htmlDictionary[listNameFromQuery].customFunction !== "undefined" &&
+                                spContext.htmlDictionary[listNameFromQuery].customFunction != null &&
+                                typeof spContext.htmlDictionary[listNameFromQuery].customFunction === "function") {
+                                spContext.htmlDictionary[listNameFromQuery].customFunction(listElements, spContext.htmlDictionary[listName].id);
+                            }
+                        }
+                        spContext.htmlDictionary[listNameFromQuery].run = true;
+                    }, onFailedCall, appContext);
+                }
+            } else {
+                var fullString = "";
+                if (element[i].tagName.toLowerCase() === "select" || element[i].tagName.toLowerCase() === "div") {
+                    var elementNodeText = element[i].innerHTML.trim();
+                    fullString = elementNodeText;
+                    if (typeof properties[listName] !== "undefined") {
+                        if ((typeof properties[listName].onchange !== "undefined")) {
+                            element[i].onchange = function (event) {
+                                var eventList = document.getElementById(this.id).getAttribute("speed-list-repeat");
+                                properties[eventList].onchange(event);
+                            }
+                        }
+                    }
+                }
+
+                if (typeof properties[listName] !== "undefined") {
+                    properties[listName].autoLoad = (typeof properties[listName].autoLoad == "undefined") ? true : properties[listName].autoLoad;
+                    properties[listName].customFunction = (typeof properties[listName].customAfterLoadFunction == "undefined") ? null : properties[listName].customAfterLoadFunction;
+                    customquery = (typeof properties[listName].query == "undefined") ? customquery : properties[listName].query;
+                    properties[listName].element = element[i];
+                }
+
+                if (typeof properties[listName] !== "undefined") {
+                    var intervalRef = setInterval(function () {
+                        var refList = spContext.intervalRefDictionary[intervalRef].list;
+                        var fullString = spContext.intervalRefDictionary[intervalRef].element.innerHTML.trim();
+                        if (spContext.htmlDictionary[refList].run) {
+                            $("#" + properties[refList].element.id).empty();
+                            if (typeof properties[refList] !== "undefined") {
+                                if (typeof properties[refList].customBeforeLoadFunction != "undefined" && typeof properties[refList].customBeforeLoadFunction == "function") {
+                                    properties[refList].customBeforeLoadFunction();
+                                }
+                            }
+
+                            if (setEmptyOption) {
+                                if (MessageValidation == "" || typeof MessageValidation === "undefined" || MessageValidation == null) {
+                                    $("#" + properties[refList].element.id).append("<option value=''>Please select a value</option>");
+                                } else {
+                                    $("#" + properties[refList].element.id).append("<option value=''>" + MessageValidation + "</option>");
+                                }
+                            }
+
+                            if (properties[refList].autoLoad) {
+                                var listElements = spContext.htmlDictionary[refList].data;
+                                for (var z = 0; z < listElements.length; z++) {
+                                    for (var propName in listElements[z]) {
+                                        if (properties[refList].element.tagName.toLowerCase() === "select" || properties[refList].element.tagName.toLowerCase() === "div") {
+                                            var valueToAppend = fullString;
+                                            var stringToFind = "{{" + propName + "}}";
+                                            if (valueToAppend.indexOf(stringToFind) >= 0) {
+                                                var regex = new RegExp(stringToFind, "g");
+                                                valueToAppend = valueToAppend.replace(regex, listElements[z][propName]);
+                                                $("#" + properties[refList].element.id).append(valueToAppend);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (typeof properties[refList].customFunction !== "undefined") {
+                                if (typeof properties[refList].customFunction !== "undefined" && properties[refList].customFunction != null &&
+                                    typeof properties[refList].customFunction === "function") {
+                                    properties[refList].customFunction(listElements, properties[refList].element.id);
+                                }
+                            }
+                            clearInterval(intervalRef);
+                        }
+
+                    }, 1000);
+                    spContext.intervalRefDictionary[intervalRef] = {
+                        list: listName,
+                        element: element[i]
+                    };
+                }
+
             }
         }
     }
@@ -740,86 +1865,262 @@ Speed.prototype.applyValidationEvents = function () {
     var speedPointContext = this;
     //Speed bind and validate html
     var elementValidate = document.querySelectorAll("[speed-bind-validate]");
-    for (var i = 0; i <= (elementValidate.length - 1) ; i++) {
-        var elementEventData = jQuery._data(elementValidate[i], "events");
-        if (typeof elementEventData === "undefined") {
-            if (elementValidate[i].tagName.toLowerCase() == "input" || elementValidate[i].tagName.toLowerCase() == "textarea") {
-                elementValidate[i].addEventListener("keyup", function () {
-                    var msg = this.getAttribute("speed-validate-msg");
-                    var inputtype = this.getAttribute("speed-validate-type");
-                    var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
-                    var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
-                    speedPointContext.validateField(
-                    {
-                        id: this.id,
-                        msg: validationMessage,
-                        extension: validationtype,
-                        addErrors: false,
-                        styleElement: true,
-                        removeHtmlErrors: true,
-                        triggerCallback: function (id, msg) {
-                            $("#" + id).siblings(".temp-speedmsg").remove();
-                            $("<p class='temp-speedmsg'>" + msg + "</p>").insertBefore("#" + id);
+    for (var i = 0; i <= (elementValidate.length - 1); i++) {
+        //var elementEventData = jQuery._data(elementValidate[i], "events");
+        //elementEventData = (typeof elementEventData === "undefined") ? {} : elementEventData;
+        if ($.inArray(elementValidate[i].id, speedPointContext.appliedEvents.normal) < 0) {
+            var eventOn = (elementValidate[i].getAttribute("speed-event-switch") === null) ? true : (elementValidate[i].getAttribute("speed-event-switch") === "true");
+            if (eventOn) {
+                if (elementValidate[i].tagName.toLowerCase() == "input" || elementValidate[i].tagName.toLowerCase() == "textarea") {
+                    if (elementValidate[i].type.toLowerCase() !== "checkbox" && elementValidate[i].type.toLowerCase() !== "radio") {
+                        speedPointContext.appliedEvents.normal.push(elementValidate[i].id);
+                        elementValidate[i].addEventListener("keyup", function () {
+                            var msg = this.getAttribute("speed-validate-msg");
+                            var inputtype = this.getAttribute("speed-validate-type");
+                            var onValidation = (this.getAttribute("speed-validate-mode") === null) ? true : (this.getAttribute("speed-validate-mode") === "true");
+                            var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
+                            var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
+                            if (onValidation) {
+                                speedPointContext.validateField({
+                                    id: this.id,
+                                    msg: validationMessage,
+                                    extension: validationtype,
+                                    addErrors: false,
+                                    styleElement: true,
+                                    removeHtmlErrors: true,
+                                    triggerCallback: function (id, msg) {
+                                        $("#" + id).siblings(".temp-speedmsg").remove();
+                                        $("<p class='temp-speedmsg'>" + msg + "</p>").insertBefore("#" + id);
+                                    }
+                                });
+                            }
+                        });
+                    } else if (elementValidate[i].type.toLowerCase() === "checkbox") {
+                        speedPointContext.appliedEvents.normal.push(elementValidate[i].id);
+                        elementValidate[i].addEventListener("change", function () {
+                            var msg = this.getAttribute("speed-validate-msg");
+                            var inputtype = this.getAttribute("speed-validate-type");
+                            var onValidation = (this.getAttribute("speed-validate-mode") === null) ? true : (this.getAttribute("speed-validate-mode") === "true");
+                            var multivalue = (this.getAttribute("sptype") === null) ? false : (this.getAttribute("sptype").toLowerCase() === "multivalue");
+                            var overideValidation = (this.getAttribute("sptype-overide-validation") === null) ? true : (this.getAttribute("sptype-overide-validation") === "true");
+                            if (overideValidation && multivalue) {
+                                inputtype = "multivalue";
+                            }
+                            var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please select a value" : msg;
+                            var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
+                            if (onValidation) {
+                                speedPointContext.validateField({
+                                    id: this.id,
+                                    msg: validationMessage,
+                                    extension: validationtype,
+                                    addErrors: false,
+                                    styleElement: true,
+                                    removeHtmlErrors: true,
+                                });
+                            }
+                        });
+                    } else if (elementValidate[i].type.toLowerCase() === "radio") {
+                        speedPointContext.appliedEvents.normal.push(elementValidate[i].id);
+                        elementValidate[i].addEventListener("change", function () {
+                            var msg = this.getAttribute("speed-validate-msg");
+                            var inputtype = this.getAttribute("speed-validate-type");
+                            var onValidation = (this.getAttribute("speed-validate-mode") === null) ? true : (this.getAttribute("speed-validate-mode") === "true");
+                            var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please select a value" : msg;
+                            var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
+                            if (onValidation) {
+                                speedPointContext.validateField({
+                                    id: this.id,
+                                    msg: validationMessage,
+                                    extension: validationtype,
+                                    addErrors: false,
+                                    styleElement: true,
+                                    removeHtmlErrors: true,
+                                });
+                            }
+                        });
+                    }
+
+                } else if (elementValidate[i].tagName.toLowerCase() == "select") {
+                    speedPointContext.appliedEvents.normal.push(elementValidate[i].id);
+                    elementValidate[i].addEventListener("change", function () {
+                        var msg = this.getAttribute("speed-validate-msg");
+                        var inputtype = this.getAttribute("speed-validate-type");
+                        var onValidation = (this.getAttribute("speed-validate-mode") === null) ? true : (this.getAttribute("speed-validate-mode") === "true");
+                        var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please select a value" : msg;
+                        var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
+                        if (onValidation) {
+                            speedPointContext.validateField({
+                                id: this.id,
+                                msg: validationMessage,
+                                extension: validationtype,
+                                addErrors: false,
+                                styleElement: true,
+                                removeHtmlErrors: true,
+                                triggerCallback: function (id, msg) {
+                                    $("#" + id).siblings(".temp-speedmsg").remove();
+                                    $("<p class='temp-speedmsg'>" + msg + "</p>").insertBefore("#" + id);
+                                }
+                            });
                         }
                     });
-                });
-            }
-            else if (elementValidate[i].tagName.toLowerCase() == "select") {
-                elementValidate[i].addEventListener("change", function () {
-                    var msg = this.getAttribute("speed-validate-msg");
-                    var inputtype = this.getAttribute("speed-validate-type");
-                    var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
-                    var validationtype = (inputtype == null || inputtype == "" || inputtype == "undefined") ? "" : inputtype;
-                    speedPointContext.validateField(
-                    {
-                        id: this.id,
-                        msg: validationMessage,
-                        extension: validationtype,
-                        addErrors: false,
-                        styleElement: true,
-                        removeHtmlErrors: true,
-                        triggerCallback: function (id, msg) {
-                            $("#" + id).siblings(".temp-speedmsg").remove();
-                            $("<p class='temp-speedmsg'>" + msg + "</p>").insertBefore("#" + id);
-                        }
-                    });
-                });
+                }
             }
         }
     }
 
     var elementPeopleValidate = document.querySelectorAll("[speed-people-validate]");
     for (var i = 0; i <= (elementPeopleValidate.length - 1); i++) {
-        var elementId = elementPeopleValidate[i].id;
-        var elementNode = document.getElementById(elementId);
-        var msg = elementNode.getAttribute("speed-validate-msg");
-        var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
-        var pickerID = elementId + '_TopSpan';
-        var pickerHashLookupError = elementId + "_Error";
-        var elementDictionary = SPClientPeoplePicker.SPClientPeoplePickerDict[(pickerID)];
-        if (elementDictionary.OnValueChangedClientScript !== null) {
-            speedPointContext.tempCallbacks[pickerID] = elementDictionary.OnValueChangedClientScript;
-        }
-        speedPointContext.tempCallbacks[pickerHashLookupError] = validationMessage;
-        elementDictionary.OnValueChangedClientScript = function (elementDivId, userInfo) {
-            var parentId = elementDivId.slice(0, elementDivId.indexOf("_TopSpan"));
-            var HashLookupError = parentId + "_Error";
-            if (userInfo.length === 0) {
-                speedPointContext.validateField({ id: elementDivId, staticValue: "", msg: validationMessage, elementType: "text", useElementProperties: false });
-                $("#" + parentId).siblings(".temp-speedmsg").remove();
-                $("<p class='temp-speedmsg'>" + speedPointContext.tempCallbacks[HashLookupError] + "</p>").insertBefore("#" + parentId);
-            }
-            else {
-                $("#" + parentId).siblings(".temp-speedmsg").remove();
-                $("#" + elementDivId).removeClass("speedhtmlerr");
-            }
+        var eventOn = (elementPeopleValidate[i].getAttribute("speed-event-switch") === null) ? true : (elementPeopleValidate[i].getAttribute("speed-event-switch") === "true");
+        if (eventOn) {
+            var elementId = elementPeopleValidate[i].id;
+            var elementNode = document.getElementById(elementId);
+            var msg = elementNode.getAttribute("speed-validate-msg");
+            var validationMessage = (msg == null || msg == "" || msg == "undefined") ? "Please fill in a value" : msg;
+            var pickerID = elementId + '_TopSpan';
+            var pickerHashLookupError = elementId + "_Error";
 
-            if (typeof speedPointContext.tempCallbacks[elementDivId] !== "undefined") {
-                speedPointContext.tempCallbacks[elementDivId](elementDivId, userInfo);
+            var elementDictionary = SPClientPeoplePicker.SPClientPeoplePickerDict[(pickerID)];
+            speedPointContext.tempCallbacks[pickerHashLookupError] = validationMessage;
+
+            if (elementDictionary.OnValueChangedClientScript === null) {
+                elementDictionary.OnValueChangedClientScript = function (elementDivId, userInfo) {
+                    var parentId = elementDivId.slice(0, elementDivId.indexOf("_TopSpan"));
+                    var HashLookupError = parentId + "_Error";
+                    if (userInfo.length === 0) {
+                        speedPointContext.validateField({
+                            id: elementDivId,
+                            staticValue: "",
+                            msg: validationMessage,
+                            elementType: "text",
+                            useElementProperties: false
+                        });
+                        $("#" + parentId).siblings(".temp-speedmsg").remove();
+                        $("<p class='temp-speedmsg'>" + speedPointContext.tempCallbacks[HashLookupError] + "</p>").insertBefore("#" + parentId);
+                    } else {
+                        $("#" + parentId).siblings(".temp-speedmsg").remove();
+                        $("#" + elementDivId).removeClass("speedhtmlerr");
+                    }
+
+                    if (typeof speedPointContext.tempCallbacks[elementDivId] !== "undefined") {
+                        speedPointContext.tempCallbacks[elementDivId](elementDivId, userInfo);
+                    }
+                }
             }
         }
     }
 }
+
+//========================= Numeric Implementation Section ======================
+/**
+ * The numericEvents function activates the event handlers for the html elements with the speed-bind-currency attribute
+ */
+Speed.prototype.numericEvents = function () {
+    var speedPointContext = this;
+    var elementCurrency = document.querySelectorAll("[speed-bind-currency]");
+    for (var i = 0; i <= (elementCurrency.length - 1); i++) {
+        for (var i = 0; i <= (elementCurrency.length - 1); i++) {
+            //var elementEventData = jQuery._data(elementCurrency[i], "events");
+            if ($.inArray(elementCurrency[i].id, speedPointContext.appliedEvents.numeric) < 0) {
+                if (elementCurrency[i].tagName.toLowerCase() == "input" && elementCurrency[i].type.toLowerCase() === "text") {
+                    speedPointContext.appliedEvents.numeric.push(elementCurrency[i].id);
+                    elementCurrency[i].addEventListener("keydown", function (evt) {
+                        //console.log(evt);
+                        if (!isNaN(evt.key) && evt.key !== " ") {
+                            var valueHolder = "";
+
+                            //condition to check if the positioning of the input will be behind of at a position
+                            if (evt.target.selectionStart === this.value.length) {
+                                valueHolder = this.value + evt.key;
+                            } else {
+                                valueHolder = this.value.substr(0, evt.target.selectionStart) + evt.key + this.value.substr(evt.target.selectionStart);
+                            }
+
+                            var currency = this.getAttribute("speed-bind-currency");
+                            var numberValue = speedPointContext.stripCurrencyToNumber(valueHolder, currency);
+                            var passState = true;
+
+                            //number condition not to allow more than 2decimal places
+                            if (numberValue.toString().indexOf(".") > 0) {
+                                var tempStr = numberValue.toString().split(".");
+                                var decimalPt = tempStr[1];
+                                if (decimalPt.length > 2) {
+                                    passState = false;
+                                    evt.preventDefault();
+                                }
+                            }
+
+                            if (passState) {
+                                var tempValue = speedPointContext.numberWithCommas(numberValue);
+                                this.value = currency + tempValue;
+                            }
+                            evt.preventDefault();
+                        } else if (speedPointContext.allowedKeys(evt)) {
+                            if (evt.key.toLowerCase() === "backspace") {
+                                var valueHolder = this.value.substring(0, this.value.length - 1);
+                                var currency = this.getAttribute("speed-bind-currency");
+                                var numberValue = speedPointContext.stripCurrencyToNumber(valueHolder, currency);
+                                var tempValue = speedPointContext.numberWithCommas(numberValue);
+                                if (tempValue === "")
+                                    this.value = tempValue;
+                                else {
+                                    this.value = currency + tempValue;
+                                }
+                                evt.preventDefault();
+                            } else if (evt.key == ".") {
+                                if (this.value.toString().indexOf(evt.key) > 0) {
+                                    evt.preventDefault();
+                                }
+                            }
+                        } else {
+                            evt.preventDefault();
+                        }
+                    });
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The allowedKeys function check the keys allowed for the numeric handler
+ */
+Speed.prototype.allowedKeys = function (evt) {
+    if (evt.key.toLowerCase() === "backspace") {
+        return true;
+    }
+
+    if (evt.key === ".") {
+        return true;
+    }
+
+    if (evt.key.toLowerCase() === "arrowleft") {
+        return true;
+    }
+
+    if (evt.key.toLowerCase() === "arrowright") {
+        return true;
+    }
+}
+
+/**
+ * The stripCurrencyToNumber function check the keys allowed for the numeric handler
+ */
+Speed.prototype.stripCurrencyToNumber = function (value, currency, stringval) {
+    var currencyfull = (typeof stringval === "undefined") ? false : stringval;
+    var numberValue = value.replace(currency, "");
+    numberValue = numberValue.replace(/,/g, "");
+    if (currencyfull) numberValue = value;
+    return numberValue;
+}
+
+/**
+ * The numberWithCommas function returns numbers with comma seperation
+ * @param {Int} numberToConvert the parameter supplies the number to add the commas to
+ * @returns {String} the result output.
+ */
+Speed.prototype.numberWithCommas = function (numberToConvert) {
+    return numberToConvert.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
 
 /* ============================== List Section ============================*/
 /**
@@ -850,32 +2151,30 @@ Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appC
         var allGroups = oWebsite.get_siteGroups();
         context.load(allGroups);
         context.executeQueryAsync(
-           function () {
-               window.speedGlobal[total].breakRoleInheritance(false, true);
-               var count = allGroups.get_count();
-               for (var i = 0; i <= (parseInt(count) - 1) ; i++) {
-                   var grp = allGroups.getItemAtIndex(i);
-                   //provide your group name
-                   for (var x in listProperties.group) {
-                       if (grp.get_loginName() == listProperties.group[x].name) {
-                           // All users , EveryOne , All Athenticated Users
-                           //var userobj = oWebsite.ensureUser("c:0(.s|true");
-                           var role = SP.RoleDefinitionBindingCollection.newObject(context);
-                           role.add(oWebsite.get_roleDefinitions().getByType(listProperties.group[x].role));
-                           window.speedGlobal[total].get_roleAssignments().add(grp, role);
-                       }
-                   }
-               }
-               context.load(window.speedGlobal[total]);
-               context.executeQueryAsync(function () {
-                   setTimeout(function () {
-                       onSuccess();
-                   }, 1000);
-               }
-                , Function.createDelegate(this, onFailedCall));
-           }, Function.createDelegate(this, onFailedCall));
-    }
-    else if (setuser) {
+            function () {
+                window.speedGlobal[total].breakRoleInheritance(false, true);
+                var count = allGroups.get_count();
+                for (var i = 0; i <= (parseInt(count) - 1); i++) {
+                    var grp = allGroups.getItemAtIndex(i);
+                    //provide your group name
+                    for (var x in listProperties.group) {
+                        if (grp.get_loginName() == listProperties.group[x].name) {
+                            // All users , EveryOne , All Athenticated Users
+                            //var userobj = oWebsite.ensureUser("c:0(.s|true");
+                            var role = SP.RoleDefinitionBindingCollection.newObject(context);
+                            role.add(oWebsite.get_roleDefinitions().getByType(listProperties.group[x].role));
+                            window.speedGlobal[total].get_roleAssignments().add(grp, role);
+                        }
+                    }
+                }
+                context.load(window.speedGlobal[total]);
+                context.executeQueryAsync(function () {
+                    setTimeout(function () {
+                        onSuccess();
+                    }, 1000);
+                }, Function.createDelegate(this, onFailedCall));
+            }, Function.createDelegate(this, onFailedCall));
+    } else if (setuser) {
         for (var x in listProperties.users) {
             var userobj = oWebsite.ensureUser(listProperties.users[x].login);
             var role = SP.RoleDefinitionBindingCollection.newObject(context);
@@ -888,17 +2187,14 @@ Speed.prototype.createList = function (listProperties, onSuccess, onFailed, appC
             setTimeout(function () {
                 onSuccess();
             }, 1000);
-        }
-         , Function.createDelegate(this, onFailedCall));
-    }
-    else {
+        }, Function.createDelegate(this, onFailedCall));
+    } else {
         context.load(window.speedGlobal[total]);
         context.executeQueryAsync(function () {
             setTimeout(function () {
                 onSuccess();
             }, 1000);
-        }
-         , Function.createDelegate(this, onFailedCall));
+        }, Function.createDelegate(this, onFailedCall));
     }
 }
 //----------------------create fields for a list --------------------------
@@ -933,8 +2229,7 @@ Speed.prototype.createColumnInList = function (arr, listName, onSuccess, onFaile
         setTimeout(function () {
             onSuccess();
         }, 1000);
-    }
-     , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -946,25 +2241,6 @@ Speed.prototype.createColumnInList = function (arr, listName, onSuccess, onFaile
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to update, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //create an object where the property name is the same as the Column name in the list you want to update
- * //in this case i have a column Title i want to update 
- * var objectToUpdate = {};
- * objectToUpdate.Title = "Testing";
- * //after that i have to set the ID of the item i want to update, in this example the ID is 2. without the ID the items wont update
- * objectToUpdate.ID = 2;
- * //then pass the object to an array, we are only passing this object so only the object is updated, if you have multiple items,
- * then add them to the array 
- * var ListItems = [];
- * ListItems.push(objectToUpdate);
- * //then i call the speed update function
- * speedctx.updateItems(ListItems, "Leave",function(){
- *      console.log("I succeeded in updating .....");
- * });
- * 
- * //for cross domain example please reference the docs..............
  */
 Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
@@ -980,9 +2256,7 @@ Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appC
                 var items = [];
                 items[i] = passwordList.getItemById(itemProperties.ID);
                 for (var propName in itemProperties) {
-                    if (propName.toLowerCase() == "id") {
-                    }
-                    else {
+                    if (propName.toLowerCase() == "id") {} else {
                         items[i].set_item(propName, itemProperties[propName]);
                     }
                 }
@@ -1002,31 +2276,6 @@ Speed.prototype.updateItems = function (arr, listName, onSuccess, onFailed, appC
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to create, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //create an object where the property name is the same as the Column name in the list you want to create the item in
- * //in this case i have a column Title and EmployeeName i want to set the value for 
- * var objectToUpdate = {};
- * objectToCreate.Title = "Testing";
- * objectToCreate.EmployeeName = "Jacob Blast";
- * //then pass the object to an array, we are only passing this object so only the object is created, if you have multiple items,
- * then add them to the array, all will be created.
- * var ListItems = [];
- * ListItems.push(objectToCreate);
- * //then i call the speed create function
- * speedctx.createItems(ListItems, "Leave",function(itemProperties){
- *      for(var x = 0; x <= (itemProperties.length - 1); x++){
- *          //log all IDs for the newly created items
- *          console.log(itemProperties[x].get_id());
- *      }
- *      console.log("I succeeded in creating the items .....");
- * });
- * 
- * //the itemProperties Array returned contains an array of SP.Item Objects which contains details about the object, in this case we are retrieving the id 
- * //of the created objects respectively, if 10 items are in the array, 10 SP.items objects will be contained in the array returned
- * 
- * //for cross domain example please reference the docs..............
  */
 Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
@@ -1054,8 +2303,7 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
                 setTimeout(function () {
                     onSuccess(listitemArr);
                 }, 1000);
-            }
-            , Function.createDelegate(this, onFailedCall));
+            }, Function.createDelegate(this, onFailedCall));
         }
     }
 };
@@ -1068,14 +2316,6 @@ Speed.prototype.createItems = function (arr, listName, onSuccess, onFailed, appC
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the row fails to deleted, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //then i call the speed delete function and pass in the ID of the Item in the right parameter
- * speedctx.deleteItem("Leave",1,function(){
- *      console.log("deleting the item .....");
- * });
- * //for cross domain example please reference the docs..............
  */
 Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
@@ -1092,8 +2332,7 @@ Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appCon
         setTimeout(function () {
             onSuccess();
         }, 1000);
-    }
-    , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 };
 
 /**
@@ -1105,28 +2344,15 @@ Speed.prototype.deleteItem = function (listname, id, onSuccess, onFailed, appCon
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //then i call the speed getItem function with all the parameters
- * speedctx.getItem("Leave","<Caml Query string>",function(items){
- *      // an enumerator of items returned based on the query passed
- *      var listEnumerator = items.getEnumerator();
- *      while (listEnumerator.moveNext()) {
- *          //retrieves the value of the Title Column for the current item
- *          var title = listEnumerator.get_current().get_item('Title');
- *      }
- * });
- * 
- * //for cross domain example please reference the docs..............
  */
 Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appContext) {
+    var SpeedContext = this;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var query = (typeof caml === '' || caml == null) ? this.camlBuilder() : caml;
     var context = this.initiate();
     var oList = context.get_web().get_lists().getByTitle(listName);
     var camlQuery = new SP.CamlQuery();
-    camlQuery.set_viewXml(caml);
+    camlQuery.set_viewXml(query);
     window.speedGlobal.push(oList.getItems(camlQuery));
     var total = window.speedGlobal.length;
     total--;
@@ -1134,12 +2360,14 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
         context = appContext.initiate();
     }
     context.load(window.speedGlobal[total]);
+    window.speedGlobal[total].ListName = listName;
     context.executeQueryAsync(function () {
+
         setTimeout(function () {
             onSuccess(window.speedGlobal[total]);
+            SpeedContext.asyncManager(window.speedGlobal[total].ListName);
         }, 1000);
-    }
-        , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 //* ====================== Helper Functions ========================*//
@@ -1157,7 +2385,16 @@ Speed.prototype.getItem = function (listName, caml, onSuccess, onFailed, appCont
 Speed.prototype.getListToControl = function (listName, caml, controls, onSuccess, onFailed, appContext) {
     var SpeedContext = this;
     var controlArray = this.getControls();
-    var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
+    var controlsData = [];
+    if ($.type(controls) === "object") {
+        controlsData = controls.data;
+        if (!controls.merge) {
+            controlArray = [];
+        }
+    } else {
+        controlsData = controls;
+    }
+    var controlsToUse = ($.isArray(controlsData)) ? $.merge(controlArray, controlsData) : controlArray;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
     var oList = context.get_web().get_lists().getByTitle(listName);
@@ -1174,34 +2411,36 @@ Speed.prototype.getListToControl = function (listName, caml, controls, onSuccess
     context.executeQueryAsync(function () {
         var objectToReturn = {};
         var items = window.speedGlobal[total].getItemAtIndex(0);
-        
+
         if (typeof items !== "undefined") {
-            for (var i = 0; i <= (controlsToUse.length - 1) ; i++) {
+            for (var i = 0; i <= (controlsToUse.length - 1); i++) {
                 var SPFieldType;
+                var nopropinJSEngine = false;
                 try {
                     SPFieldType = items.get_item(controlsToUse[i]).__proto__.constructor.__typeName.toLowerCase();
-                }
-                catch (ex) {
-                    SPFieldType = "string";
+                } catch (ex) {
+                    try {
+                        nopropinJSEngine = true;
+                        SPFieldType = $.type(items.get_item(controlsToUse[i]));
+                    } catch (ex) {
+                        SPFieldType = "string";
+                    }
                 }
                 if (controlsToUse[i] === "SPItem") {
                     objectToReturn.SPItem = items;
-                }
-                else if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
+                } else if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue" || (nopropinJSEngine && SPFieldType.toLowerCase() === "object")) {
                     var objProp = {};
                     objProp.id = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_lookupId());
                     objProp.value = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_lookupValue());
-                    if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
+                    if (SPFieldType.toLowerCase() === "sp.fielduservalue" || (nopropinJSEngine && SPFieldType.toLowerCase() === "object")) {
                         try {
                             objProp.email = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_email());
-                        }
-                        catch (e) {
+                        } catch (e) {
                             objProp.email = "";
                         };
                     }
                     objectToReturn[controlsToUse[i]] = objProp;
-                }
-                else if (SPFieldType.toLowerCase() === "array") {
+                } else if (SPFieldType.toLowerCase() === "array") {
                     var multiUser = items.get_item(controlsToUse[i]);
                     var arrayToSave = [];
                     for (var j = 0; j <= (multiUser.length - 1); j++) {
@@ -1210,22 +2449,19 @@ Speed.prototype.getListToControl = function (listName, caml, controls, onSuccess
                         objectOfUsers.value = multiUser[j].get_lookupValue();
                         try {
                             objectOfUsers.email = multiUser[j].get_email();
-                        }
-                        catch (e) {
+                        } catch (e) {
                             objectOfUsers.email = "";
                         };
                         arrayToSave.push(objectOfUsers);
                     }
                     objectToReturn[controlsToUse[i]] = arrayToSave;
-                }
-                else
+                } else
                     objectToReturn[controlsToUse[i]] = SpeedContext.checkNull(items.get_item(controlsToUse[i]));
 
             }
         }
         onSuccess(objectToReturn);
-    }
-    , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -1241,8 +2477,18 @@ Speed.prototype.getListToControl = function (listName, caml, controls, onSuccess
  */
 Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, conditions, onSuccess, onFailed, appContext) {
     var SpeedContext = this;
-    var controlArray = this.getControls(tableonly);
-    var controlsToUse = ($.isArray(controls)) ? $.merge(controlArray, controls) : controlArray;
+    var tableId = (typeof controls.tableid !== "") ? controls.tableid : "";
+    var controlArray = [];
+    var pageControls = (typeof controls.useTableControls === "undefined") ? true : controls.useTableControls;
+    if (pageControls) {
+        controlArray = this.getControls(tableonly, tableId);
+    }
+    var mergeControls = (typeof controls.merge === "undefined") ? true : controls.merge;
+    if (mergeControls) {
+        var controlsToUse = ($.isArray(controls.data)) ? $.merge(controlArray, controls.data) : controlArray;
+    } else {
+        var controlsToUse = controls.data;
+    }
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
 
     this.getItem(listName, caml, function (itemProperties) {
@@ -1252,28 +2498,37 @@ Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, 
             var objectToReturn = {};
             for (var i = 0; i <= (controlsToUse.length - 1); i++) {
                 var SPFieldType;
+                var nopropinJSEngine = false;
                 try {
                     SPFieldType = listEnumerator.get_current().get_item(controlsToUse[i]).__proto__.constructor.__typeName.toLowerCase();
+                } catch (ex) {
+                    try {
+                        nopropinJSEngine = true;
+                        SPFieldType = $.type(listEnumerator.get_current().get_item(controlsToUse[i]));
+                    } catch (ex) {
+                        SPFieldType = "string";
+                    }
                 }
-                catch (ex) {
-                    SPFieldType = "string";
-                }
-                if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue") {
+                if (SPFieldType.toLowerCase() === "sp.fielduservalue" || SPFieldType.toLowerCase() === "sp.fieldlookupvalue" || (nopropinJSEngine && SPFieldType.toLowerCase() === "object")) {
                     var objProp = {};
                     objProp.id = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]).get_lookupId());
                     objProp.value = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]).get_lookupValue());
-                    if (SPFieldType.toLowerCase() === "sp.fielduservalue") {
+                    if (SPFieldType.toLowerCase() === "sp.fielduservalue" || (nopropinJSEngine && SPFieldType.toLowerCase() === "object")) {
                         try {
-                            objProp.email = SpeedContext.checkNull(items.get_item(controlsToUse[i]).get_email());
-                        }
-                        catch (e) {
+                            objProp.email = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]).get_email());
+                        } catch (e) {
                             objProp.email = "";
                         };
                     }
+
+                    if (typeof conditions === "object" && conditions !== null) {
+                        if (typeof conditions[controlsToUse[i]] !== "undefined") {
+                            objProp = conditions[controlsToUse[i]](objProp);
+                        }
+                    }
                     objectToReturn[controlsToUse[i]] = objProp;
-                }
-                else if (SPFieldType.toLowerCase() === "array") {
-                    var multiUser = items.get_item(controlsToUse[i]);
+                } else if (SPFieldType.toLowerCase() === "array") {
+                    var multiUser = listEnumerator.get_current().get_item(controlsToUse[i]);
                     var arrayToSave = [];
                     for (var j = 0; j <= (multiUser.length - 1); j++) {
                         var objectOfUsers = {};
@@ -1281,20 +2536,30 @@ Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, 
                         objectOfUsers.value = multiUser[j].get_lookupValue();
                         try {
                             objectOfUsers.email = multiUser[j].get_email();
-                        }
-                        catch (e) {
+                        } catch (e) {
                             objectOfUsers.email = "";
                         };
                         arrayToSave.push(objectOfUsers);
                     }
+
+                    if (typeof conditions === "object" && conditions !== null) {
+                        if (typeof conditions[controlsToUse[i]] !== "undefined") {
+                            arrayToSave = conditions[controlsToUse[i]](arrayToSave);
+                        }
+                    }
                     objectToReturn[controlsToUse[i]] = arrayToSave;
-                }
-                else {
-                    objectToReturn[controlsToUse[i]] = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]));
+                } else {
+                    var columnValue = SpeedContext.checkNull(listEnumerator.get_current().get_item(controlsToUse[i]));
+                    if (typeof conditions === "object" && conditions !== null) {
+                        if (typeof conditions[controlsToUse[i]] !== "undefined") {
+                            columnValue = conditions[controlsToUse[i]](columnValue);
+                        }
+                    }
+                    objectToReturn[controlsToUse[i]] = columnValue;
                 }
             }
 
-            if (typeof conditions !== null && typeof conditions === "function") {
+            if (conditions !== null && typeof conditions === "function") {
                 objectToReturn = conditions(objectToReturn);
             }
 
@@ -1303,8 +2568,38 @@ Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, 
                 listItems.push(objectToReturn);
             }
         }
-        onSuccess(listItems);
+        onSuccess(listItems, itemProperties.ListName);
     }, onFailedCall, appContext);
+}
+
+/**
+ * Exports a List to an Array. All list items is returned based on the query
+ * @param {String} listName this parameter specifices the list which the data are to be retrieved
+ * @param {array} extraFields this parameter includes extra columns to be included into obtain columns on the form. 
+ * @param {callback} onSuccess this parameter is the call back function thats called when the list and the columns have been created succssfully
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.formAppInitialization = function (listName, extraFields, callback, onFailed, appContext) {
+    var spContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var extraFields = (typeof extraFields === "undefined") ? [] : extraFields;
+    var listProperties = {};
+    listProperties.title = listName;
+    listProperties.templateType = SP.ListTemplateType.genericList;
+    listProperties.description = "";
+    var arr = spContext.getControls(false, true);
+    if (extraFields.length !== 0) {
+        arr = arr.concat(extraFields);
+    }
+    spContext.createList(listProperties, function () {
+        //when list is created
+        spContext.createColumnInList(arr, listProperties.title, callback, onFailedCall, appContext);
+    }, function (sender, args) {
+        //if list already exist
+        spContext.createColumnInList(arr, listProperties.title, callback, onFailedCall, appContext);
+    }, appContext);
 }
 
 /* ============================== General Section ============================*/
@@ -1313,17 +2608,11 @@ Speed.prototype.getListToItems = function (listName, caml, controls, tableonly, 
  * @param {String} name parameter name
  * @param {String} url url to check for value
  * @returns {String} the parameter value.
- * @example
- * var urlOfPage = http://speedpoint.sharepoint.com?itemid=200
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the value 200 for the itemid parameter in the url
- * var itemID = speedctx.getParameterByName("itemid", urlOfPage);
  */
 Speed.prototype.getParameterByName = function (name, url) {
     if (!url) url = window.location.href;
     url = url.toLowerCase(); // This is just to avoid case sensitiveness
-    name = name.replace(/[\[\]]/g, "\\$&").toLowerCase();// This is just to avoid case sensitiveness for query parameter name
+    name = name.replace(/[\[\]]/g, "\\$&").toLowerCase(); // This is just to avoid case sensitiveness for query parameter name
     var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
         results = regex.exec(url);
     if (!results) return null;
@@ -1353,11 +2642,6 @@ Speed.prototype.checkScriptDuplicates = function (scriptToCheck) {
 /**
  * The uniqueIdGenerator function generates a unique id 
  * @returns {String} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns a GUID number xxxxxxxx-xxxx-xxxxxxxx
- * var guid = speedctx.uniqueIdGenerator();
  */
 Speed.prototype.uniqueIdGenerator = function () {
     var d = new Date().getTime();
@@ -1375,48 +2659,51 @@ Speed.prototype.uniqueIdGenerator = function () {
 /**
  * The serverDate function gets the current sharepoint server date time
  * @returns {Date} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the date on the sharepoint server
- * var serverdate = speedctx.serverDate();
  */
-Speed.prototype.serverDate = function () {
-    return new Date(new Date().getTime() + _spPageContextInfo.clientServerTimeDelta);
+Speed.prototype.serverDate = function (dateObj) {
+    var datetoUse = (typeof dateObj === "undefined") ? new Date() : new Date(dateObj);
+    return new Date(datetoUse.getTime() + _spPageContextInfo.clientServerTimeDelta);
 }
+
 //--------------------------------stringnify date------------------
 /**
  * The stringnifyDate function converts a date object to string
  * @param {Object} [obj = {value: this.serverDate}] parameter supplies a settings object for converting to string. by default the server date is used
  * @returns {String} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the string of the current date in format dd/mm/yy
- * var stringDate = speedctx.stringnifyDate();
- * 
- * //returns the string of the current date in format dd/mm/yy and includes time
- * var stringDate = speedctx.stringnifyDate({includeTime : true});
- * 
- * //returns the string of the time passed in the value parameter in format dd/mm/yy and includes time
- * var stringDate = speedctx.stringnifyDate({includeTime : true, value : "10/10/2018"});
- * 
- * //returns the string of the time passed in the value parameter in format mm-dd-yy and includes time with no spacing between the time
- * var stringDate = speedctx.stringnifyDate({includeTime : true, value : "10/10/2018", format : "mm-dd-yy", timeSpace : false});
  */
 Speed.prototype.stringnifyDate = function (obj) {
+    var monthDef = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    function returnStrMonth(Month) {
+        var num = Number(Month) - 1;
+        return monthDef[num];
+    }
     if (typeof obj == "undefined") obj = {};
+    var reconstructDate = (typeof obj.reconstruct === 'undefined') ? false : obj.reconstruct
     if (typeof obj.value === 'undefined' || obj.value == "") {
         var str = this.serverDate();
-    }
-    else
+    } else {
+        if (reconstructDate) {
+            var format = obj.format;
+            var getDelimiter = format.slice(2, 3);
+            var dateObj = obj.value.split(getDelimiter);
+            //change format to used format mm dd yy
+            obj.value = dateObj[1] + getDelimiter + dateObj[0] + getDelimiter + dateObj[2];
+        }
         var str = new Date(obj.value);
+    }
 
     if (typeof obj.includeTime == "undefined") var incTime = false;
     else
         var incTime = obj.includeTime;
 
+    if (typeof obj.monthAsString == "undefined") var monthStr = false;
+    else
+        var monthStr = obj.monthAsString;
+
     if (typeof obj.timeSpace == "undefined") obj.timeSpace = true;
+
+    obj.asId = (typeof obj.asId === 'undefined') ? false : obj.asId;
 
     var year = str.getFullYear();
     var month = str.getMonth() + 1;
@@ -1453,12 +2740,13 @@ Speed.prototype.stringnifyDate = function (obj) {
             if (firstField.toLowerCase() == 'dd') {
                 finalStr += day;
                 dayused = true;
-            }
-            else if (firstField.toLowerCase() == 'mm') {
-                finalStr += month;
+            } else if (firstField.toLowerCase() == 'mm') {
+                if (monthStr)
+                    finalStr += returnStrMonth(month);
+                else
+                    finalStr += month;
                 monthUsed = true
-            }
-            else if (firstField.toLowerCase() == 'yy') {
+            } else if (firstField.toLowerCase() == 'yy') {
                 finalStr += year;
                 yearUsed = true;
             }
@@ -1468,12 +2756,13 @@ Speed.prototype.stringnifyDate = function (obj) {
             if (secondField.toLowerCase() == 'dd' && !dayused) {
                 finalStr += day;
                 dayused = true;
-            }
-            else if (secondField.toLowerCase() == 'mm' && !monthUsed) {
-                finalStr += month;
+            } else if (secondField.toLowerCase() == 'mm' && !monthUsed) {
+                if (monthStr)
+                    finalStr += returnStrMonth(month);
+                else
+                    finalStr += month;
                 monthUsed = true
-            }
-            else if (secondField.toLowerCase() == 'yy' && !yearUsed) {
+            } else if (secondField.toLowerCase() == 'yy' && !yearUsed) {
                 finalStr += year;
                 yearUsed = true;
             }
@@ -1483,26 +2772,26 @@ Speed.prototype.stringnifyDate = function (obj) {
             if (thirdField.toLowerCase() == 'dd' && !dayused) {
                 finalStr += day;
                 dayused = true;
-            }
-            else if (thirdField.toLowerCase() == 'mm' && !monthUsed) {
-                finalStr += month;
+            } else if (thirdField.toLowerCase() == 'mm' && !monthUsed) {
+                if (monthStr)
+                    finalStr += returnStrMonth(month);
+                else
+                    finalStr += month;
                 monthUsed = true
-            }
-            else if (thirdField.toLowerCase() == 'yy' && !yearUsed) {
+            } else if (thirdField.toLowerCase() == 'yy' && !yearUsed) {
                 finalStr += year;
                 yearUsed = true;
-            }
-            else {
+            } else {
                 finalStr = "Invalid Format";
                 inval = true;
             }
-        }
-        else {
+        } else {
             var finalStr = "Invalid Format";
             inval = true;
         }
-    }
-    else {
+    } else {
+        if (monthStr)
+            month = returnStrMonth(month);
         var finalStr = day + '/' + month + '/' + year;
     }
 
@@ -1512,6 +2801,14 @@ Speed.prototype.stringnifyDate = function (obj) {
         else
             finalStr += '_' + hour + '-' + minute + '-' + second;
     }
+
+    if (obj.asId) {
+        finalStr = finalStr.replace(/\//g, "");
+        finalStr = finalStr.replace(/_/g, "");
+        finalStr = finalStr.replace(/:/g, "");
+        finalStr = finalStr.replace(/-/g, "");
+        finalStr = finalStr.replace(/\s/g, "");
+    }
     return finalStr;
 };
 
@@ -1520,33 +2817,13 @@ Speed.prototype.stringnifyDate = function (obj) {
  * This is used to avoid unexpected result when retrieving values columns that are empty
  * @param {String} val parameter supplies a value to check for null
  * @returns {String} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns an empty string "" since check value is null
- * var checkvalue = null
- * var returnedValue = speedctx.checkNull(checkvalue);
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the string "Sam"
- * var checkvalue = "sam"
- * var returnedValue = speedctx.checkNull(checkvalue);
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the object {text: "Sam"}
- * var checkvalue = {text: "Sam"}
- * var returnedValue = speedctx.checkNull(checkvalue);
  */
 Speed.prototype.checkNull = function (val) {
-    if(typeof val == "string")
-        return val.toString();//.replace(/(?:\r\n|\r|\n)/g, '<br />');
+    if (typeof val == "string")
+        return val.toString(); //.replace(/(?:\r\n|\r|\n)/g, '<br />');
     else if (val != null) {
         return val;
-    }
-    else
+    } else
         return '';
 };
 
@@ -1555,12 +2832,6 @@ Speed.prototype.checkNull = function (val) {
  * this method is used for presenting only text values from rich text box columns in sharepoint lists
  * @param {String} val parameter supplies a string
  * @returns {String} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns the string "take me with speed..like the flash"
- * var checkvalue = "<div>take me with speed..</div><div>like the flash</div>
- * var returnedValue = speedctx.removeHtml(checkvalue);
  */
 Speed.prototype.removeHtml = function (val) {
     var tmp = document.createElement("DIV");
@@ -1572,13 +2843,6 @@ Speed.prototype.removeHtml = function (val) {
  * The redirect function redirects to the specified page
  * @param {String} url the parameter supplies the url to redirect to
  * @param {bool} [opt= true] the parameter sets if the previous url is available in the history or not after redirecting
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //redirects from the current page to the url passed. the current page is saved in history
- * speedCtx.redirect("/homepage.aspx");
- * //redirects from the current page to the url passed. the current page is cleared from history
- * speedCtx.redirect("/homepage.aspx",false);
  */
 Speed.prototype.redirect = function (url, opt) {
     var opt = (typeof opt === 'undefined') ? true : opt;
@@ -1586,20 +2850,6 @@ Speed.prototype.redirect = function (url, opt) {
         window.location = url;
     else
         location.replace(url);
-};
-
-/**
- * The numberWithCommas function returns numbers with comma seperation
- * @param {Int} numberToConvert the parameter supplies the number to add the commas to
- * @returns {String} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns a number with currency comma limit. 2,000,000 is returned
- * var money = speedCtx.numberWithCommas(2000000);
- */
-Speed.prototype.numberWithCommas = function (numberToConvert) {
-    return numberToConvert.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
 /**
@@ -1628,14 +2878,14 @@ Speed.prototype.xmlToJson = function (xml) {
             var item = xml.childNodes.item(i);
             var nodeName = item.nodeName;
             if (typeof (obj[nodeName]) == "undefined") {
-                obj[nodeName] = xmlToJson(item);
+                obj[nodeName] = this.xmlToJson(item);
             } else {
                 if (typeof (obj[nodeName].push) == "undefined") {
                     var old = obj[nodeName];
                     obj[nodeName] = [];
                     obj[nodeName].push(old);
                 }
-                obj[nodeName].push(xmlToJson(item));
+                obj[nodeName].push(this.xmlToJson(item));
             }
         }
     }
@@ -1644,20 +2894,20 @@ Speed.prototype.xmlToJson = function (xml) {
 //------------------------------
 /**
  * The clearFileInput function clears file input selection for input of type='file' for all browsers
- * @param {node} elementObj the parameter supplies the element node
+ * @param {string} elementId the parameter supplies the element ID
  * @example
  * // returns a normal context related to the current site
  * var speedCtx = new Speed();
  * //the selection for input of id fileid is cleared
- * speedCtx.clearFileInput(document.getElementById("fileid"));
+ * speedCtx.clearFileInput("fileid");
  */
-Speed.prototype.clearFileInput = function (elementObj) {
+Speed.prototype.clearFileInput = function (elementid) {
+    elementNode = document.getElementById(elementid);
     try {
-        elementObj.value = null;
-    }
-    catch (ex) { }
-    if (elementObj.value) {
-        elementObj.parentNode.replaceChild(elementObj.cloneNode(true), elementObj);
+        elementNode.value = null;
+    } catch (ex) {}
+    if (elementNode.value) {
+        elementNode.parentNode.replaceChild(elementNode.cloneNode(true), elementNode);
     }
 }
 
@@ -1667,17 +2917,12 @@ Speed.prototype.clearFileInput = function (elementObj) {
  * @param {Date} second date to  make difference from
  * @param {String} format for the difference
  * @returns {Int} the difference
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * var date1 = speedCtx.serverDate();
- * var date2 = new Date("27-10-2018");
- * //dateDifference returns the Integer value of the difference between the two dates
- * var dateDifference = speedCtx.differenceBtwDates(date1,date2,"minutes");
  */
 Speed.prototype.differenceBtwDates = function (date1, date2, dateFormat) {
-    var formatToUse = (typeof dateFormat === "undefined") ? "day" : dateFormat;
-    var timeDiff = Math.abs(date2.getTime() - date1.getTime());
+    var formatToUse = (typeof dateFormat === "undefined") ? "hour" : dateFormat;
+    date2 = (typeof date2 === "undefined") ? this.serverDate() : date2;
+    //var timeDiff = Math.abs(date2.getTime() - date1.getTime());
+    var timeDiff = date2.getTime() - date1.getTime();
     var divisor = 1000;
     if (formatToUse === "minutes") {
         divisor *= 60;
@@ -1688,8 +2933,28 @@ Speed.prototype.differenceBtwDates = function (date1, date2, dateFormat) {
     if (formatToUse === "day") {
         divisor *= (60 * 60 * 24);
     }
+
     var diffDays = Math.ceil(timeDiff / divisor);
+
     return diffDays;
+}
+
+
+/**
+ * The differenceBtwDates function get the difference between days hours mins 
+ * @param {Date} dateT date to add
+ * @returns {Date} the new date
+ */
+Speed.prototype.addDaysToDate = function (dateT, addedTime, format) {
+    var dat = new Date(dateT);
+    var formatToUse = (typeof format === "undefined") ? "days" : format;
+    if (formatToUse === "days")
+        dat.setDate(dat.getDate() + addedTime);
+    else if (formatToUse === "hours")
+        dat = this.serverDate((dat.getTime() + addedTime * 60 * 60000));
+    else if (formatToUse === "mins")
+        dat = this.serverDate((dat.getTime() + addedTime * 60000));
+    return dat;
 }
 
 /**
@@ -1701,8 +2966,7 @@ String.prototype.SPNameFromTitle = function () {
     var valueToReturn;
     try {
         valueToReturn = this.toString().split("[")[0];
-    }
-    catch (e) {
+    } catch (e) {
         valueToReturn = this.toString();
     }
     return valueToReturn;
@@ -1712,14 +2976,27 @@ String.prototype.SPNameFromTitle = function () {
  * String Object Extension to return a login name which excludes the domain name
  * @returns String login name of the user, excludes the domain name
  */
-String.prototype.SPLoginFromFullLogin = function () {
+String.prototype.SPLoginFromFullLogin = function (fullpath) {
+    fullpath = (typeof fullpath === "undefined") ? true : fullpath;
     var returnSplit = "";
-    try {
-        returnSplit = this.toString().split("\\")[1];
+    if (fullpath) {
+        try {
+            returnSplit = this.toString().split("\\")[1];
+        } catch (e) {
+            returnSplit = this.toString();
+        }
+
+        if (typeof returnSplit == "undefined") {
+            returnSplit = this.toString().split("|")[2];
+        }
+    } else {
+        try {
+            returnSplit = this.toString().split("|")[1];
+        } catch (e) {
+            returnSplit = this.toString();
+        }
     }
-    catch (e) {
-        returnSplit = this.toString();
-    }
+
     return returnSplit;
 }
 /**
@@ -1731,8 +3008,7 @@ String.prototype.SPDomainFromFullLogin = function () {
     var returnSplit = "";
     try {
         returnSplit = this.toString().split("\\")[0];
-    }
-    catch (e) {
+    } catch (e) {
         returnSplit = this.toString();
     }
     return returnSplit;
@@ -1747,8 +3023,7 @@ String.prototype.SPDomainLoginFromFullLogin = function () {
     var returnSplit = "";
     try {
         returnSplit = this.toString().split("|")[0];
-    }
-    catch (e) {
+    } catch (e) {
         returnSplit = this.toString();
     }
     return returnSplit;
@@ -1761,39 +3036,21 @@ String.prototype.SPDomainLoginFromFullLogin = function () {
  * @param {String} [stringType = "Array"] this parameter indicated the object type you are expecting Array or object. 
  * Array is the default if nothing is passed to this parameter.
  * @returns {object} the result output.
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //returns stringToCheck as an object
- * var stringToCheck = "{"sample": "test","view": "23"}";
- * var newObject = speedCtx.JSONToObject(stringToCheck,"object");
- * 
- * //returns stringToCheck as an array. the second parameter is omited because the default value is Array
- * var stringToCheck = "["sample","test","view","23"]";
- * var newArrayObject = speedCtx.JSONToObject(stringToCheck);
- * OR
- * var newArrayObject = speedCtx.JSONToObject(stringToCheck,"Array");
- * 
- * //if an invalid object is passed and empty object or array is returned based on the string type passed
- * //returns stringToCheck as an empty object {}
- * var stringToCheck = "{sample: "test",view": "23"}";
- * var newObject = speedCtx.JSONToObject(stringToCheck,"object");
  */
 Speed.prototype.JSONToObject = function (val, stringType) {
     var returnObj;
-    var typeToUse = (typeof stringType == "undefined") ? "Array" : stringType;
+    var typeToUse = (typeof stringType == "undefined") ? "array" : stringType;
     if (val == null || val === "") {
-        if (typeToUse == "Array")
+        if (typeToUse.toLowerCase() == "array")
             returnObj = "[]";
         else
             returnObj = "{}";
     }
-    
-    try{
+
+    try {
         returnObj = JSON.parse(val);
-    }
-    catch(e){
-        if (typeToUse == "Array")
+    } catch (e) {
+        if (typeToUse.toLowerCase() == "array")
             returnObj = [];
         else
             returnObj = {};
@@ -1802,18 +3059,30 @@ Speed.prototype.JSONToObject = function (val, stringType) {
 }
 
 /**
+ * The deferenceObject function returns an object that isnt link to another reference object
+ * @param {object} referenceObject this parameter is the object to detach the reference to other objects
+ * @returns {object} the result output.
+ */
+Speed.prototype.deferenceObject = function (referenceObject) {
+    return JSON.parse(JSON.stringify(referenceObject))
+}
+
+/**
+ * The replaceSpecialkeysinString function returns the string passed while replacing the enter key with break
+ * @param {string} stringVal this parameter is the object to detach the reference to other objects
+ * @returns {string} the result output.
+ */
+Speed.prototype.replaceSpecialkeysinString = function (stringVal) {
+    return stringVal.replace(/(?:\r\n|\r|\n)/g, '<br />');
+}
+
+
+/**
  * The dataUriFormImageSrc function returns the dataUri of an file from its file path
  * @param {array} url this parameter is the url of the file on the server or solution
  * @param {callback(datauri)} onSuccess this parameter is the call back function thats called when the file is successfully retrieved
  * the datauri is returned as an argument in the success callback 
  * @param {callback(sender)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the file fails to be retrieved
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //
- * speedCtx.dataUriFormImageSrc('static/images/logo.jpg', function (dataUri) {
- *      console.log(dataUri);
- * });
  */
 Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
@@ -1833,8 +3102,7 @@ Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
             else if (fileExt.toLowerCase() == 'jpg' || fileExt.toLowerCase() == 'jpeg')
                 var dataURL = "data:image/jpeg;base64," + b64;
             callBack(dataURL);
-        }
-        else {
+        } else {
             var speedError = {};
             speedError.errorObject = this;
             if (this.responseType === "text" || this.responseType === "")
@@ -1847,6 +3115,42 @@ Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
     xmlHTTP.send();
 }
 
+/** 
+ * stringExtractor is used to get the value in between the curly braces
+ */
+String.prototype.stringExtractor = function () {
+    var startCount = 0;
+    var noOfObtained = 0;
+    var textStartCount = 0;
+    var textEndCount = 0;
+    var valuesInArray = [];
+    var stringToExtract = this.toString();
+    for (var x = 0; x < stringToExtract.length; x++) {
+        if (stringToExtract[x] === "{" && noOfObtained == 0) {
+            startCount = x;
+            noOfObtained++;
+        } else if (stringToExtract[x] === "{" && noOfObtained == 1 && (startCount + 1) == x) {
+            textStartCount = x + 1;
+            startCount = 0;
+            noOfObtained = 0;
+        }
+
+        if (stringToExtract[x] === "}" && noOfObtained == 0) {
+            startCount = x;
+            noOfObtained++;
+        } else if (stringToExtract[x] === "}" && noOfObtained === 1 && (startCount + 1) === x) {
+            textEndCount = x - 1;
+            var value = stringToExtract.substring(textStartCount, textEndCount);
+            textStartCount = 0;
+            textEndCount = 0;
+            startCount = 0;
+            noOfObtained = 0;
+            valuesInArray.push(value);
+        }
+    }
+    return valuesInArray;
+}
+
 /*============================= Email Section =========================*/
 /**
  * The sendSPEmail function sends email to to users sync with sharepoint userprfile (within the organisation)
@@ -1857,37 +3161,18 @@ Speed.prototype.dataUriFormImageSrc = function (url, callBack, onFailed) {
  * @param {String} subject the subject of the mail
  * @param {callBack} callBack this parameter is the call back function thats called when the function is successful or failed
  * @param {String} [relative = "Currentpage url is used"] this parameter changes the location of the SP utility API
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * //send mails to users in the to array, no users in copy (empty array passed)
- * var to = ["sptest@mail.com"];
- * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",[], "subject",function(status, data){
- *      if(status === "success")
- *          console.log("mail sent");
- *      else
- *          console.log("mail failed");
- * });
- * 
- * //send mails to users in the to array and users are in copy
- * var to = ["sptest@mail.com","sptest2@mail.com"];
- * speedCtx.sendSPEmail("SpeedPoint Test",to, "the content of the mail",["sptest1@mail.com","sptest2@mail.com"], "subject",function(status, data){
- *      if(status === "success")
- *          console.log("mail sent");
- *      else
- *          console.log("mail failed");
- * });
  */
-Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, relative) {
+Speed.prototype.sendSPEmail = function (mailProperties, callBack, relative) {
     //Get the relative url of the site
     var urlToUSe = (typeof relative === 'undefined') ? true : relative;
-    var ccAddress = (cc === null) ? [] : cc;
+    var ccAddress = (typeof mailProperties.cc === "undefined") ? [] : mailProperties.cc;
+    var bccAddress = (typeof mailProperties.bcc === "undefined") ? [] : mailProperties.bcc;
     var urlTemplate;
     if (urlToUSe) {
         urlTemplate = _spPageContextInfo.webServerRelativeUrl;
+        urlTemplate = (urlTemplate === "/") ? "" : urlTemplate;
         urlTemplate = urlTemplate + "/_api/SP.Utilities.Utility.SendEmail";
-    }
-    else {
+    } else {
         urlTemplate = "/_api/SP.Utilities.Utility.SendEmail";
     }
 
@@ -1900,15 +3185,18 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
                 '__metadata': {
                     'type': 'SP.Utilities.EmailProperties'
                 },
-                'From': from,
+                'From': mailProperties.from,
                 'To': {
-                    'results': to
+                    'results': mailProperties.to
                 },
                 'CC': {
                     'results': ccAddress
                 },
-                'Body': body,
-                'Subject': subject
+                'BCC': {
+                    'results': bccAddress
+                },
+                'Body': mailProperties.body,
+                'Subject': mailProperties.subject
             }
         }),
         headers: {
@@ -1929,6 +3217,45 @@ Speed.prototype.sendSPEmail = function (from, to, body, cc, subject, callBack, r
     });
 }
 
+/* ========================== SEARCH ==========================*/
+/**
+ * The search function retrieve all keywords pass in the share point platform
+ * @param {String} keyword this parameter specifices key to search on
+ * @param {object} properties this parameter settings for the search
+ * @param {callback(enumerator)} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved, SP.Item object is returned as
+ * an argument to the callback function
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.search = function (keyword, properties, onSuccess, onFailed, appContext) {
+    var properties = (onFailed == null) ? {} : properties;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var context = this.initiate();
+
+    if (typeof appContext !== 'undefined') {
+        context = appContext.initiate();
+    }
+
+    var keywordQuery = new Microsoft.SharePoint.Client.Search.Query.KeywordQuery(context);
+    keywordQuery.set_queryText(keyword);
+    if (typeof properties.people !== "undefined") {
+        if (properties.people) {
+            keywordQuery.set_sourceid = "B09A7990-05EA-4AF9-81EF-EDFAB16C4E31";
+        }
+    }
+    var searchExecutor = new Microsoft.SharePoint.Client.Search.Query.SearchExecutor(context);
+
+    var total = window.speedGlobal.length;
+    total--;
+    window.speedGlobal[total] = searchExecutor.executeQuery(keywordQuery);
+    context.executeQueryAsync(function () {
+        setTimeout(function () {
+            onSuccess(window.speedGlobal[total]);
+        }, 1000);
+    }, onFailedCall);
+}
+
 /* ============================== People Picker Section ============================*/
 /**
  * The initializePeoplePicker function initializes a people picker
@@ -1944,29 +3271,35 @@ Speed.prototype.initializePeoplePicker = function (peoplePickerElementId, proper
     var width;
     var multipleValues;
     var resolvePrincipalSource;
-    var serachPrincipalSource;
+    var searchPrincipalSource;
     var maxSuggestions;
+    var groupId;
     if (typeof properties === 'undefined') {
         resolvePrincipalSource = 15;
-        serachPrincipalSource = 15;
+        searchPrincipalSource = 15;
         multipleValues = false;
         maxSuggestions = 50;
         width = "280px";
-    }
-    else {
+        groupId = "";
+    } else {
         width = (typeof properties.width === 'undefined') ? '280px' : properties.width;
         resolvePrincipalSource = (typeof properties.resolvePrincipalSource === 'undefined') ? 15 : properties.resolvePrincipalSource;
-        serachPrincipalSource = (typeof properties.serachPrincipalSource === 'undefined') ? 15 : properties.serachPrincipalSource;
+        searchPrincipalSource = (typeof properties.searchPrincipalSource === 'undefined') ? 15 : properties.searchPrincipalSource;
         multipleValues = (typeof properties.multipleValues === 'undefined') ? false : properties.multipleValues;
         maxSuggestions = (typeof properties.maxSuggestions === 'undefined') ? 50 : properties.maxSuggestions;
+        groupId = (typeof properties.spGroupId === 'undefined') ? "" : properties.spGroupId;
     }
     var schema = {};
     schema['PrincipalAccountType'] = princpalAccount;
-    schema['SearchPrincipalSource'] = serachPrincipalSource;
+    schema['SearchPrincipalSource'] = searchPrincipalSource;
     schema['ResolvePrincipalSource'] = resolvePrincipalSource;
     schema['AllowMultipleValues'] = multipleValues;
     schema['MaximumEntitySuggestions'] = maxSuggestions;
     schema['Width'] = width;
+
+    if (groupId !== "") {
+        schema['SharePointGroupID'] = groupId;
+    }
     // Render and initialize the picker.
     // Pass the ID of the DOM element that contains the picker, an array of initial
     // PickerEntity objects to set the picker value, and a schema that defines
@@ -1975,12 +3308,41 @@ Speed.prototype.initializePeoplePicker = function (peoplePickerElementId, proper
     if (typeof setUpCall !== "undefined") {
         setTimeout(function () {
             var createdUserObject = this.SPClientPeoplePicker.SPClientPeoplePickerDict[(peoplePickerElementId + '_TopSpan')];
-            setUpCall(createdUserObject);
+            setUpCall(createdUserObject, peoplePickerElementId);
         }, 1000);
     }
 };
 
-/* ============================== People Picker Section ============================*/
+/**
+ * The getUsersFromPicker function gets users from a people picker synchronously
+ * @import SP.clientpeoplepicker.js is required
+ * @param {object} properties this parameter provides the people picker dictionary object to retrieve the users from
+ * @param {callback({object})} callback this parameter is the call back function thats called when all the people pickers are created, the People dictionary object
+ * is passed back as an argument
+ */
+Speed.prototype.createMultiplePeoplePicker = function (properties, callback) {
+    var speedContext = this;
+    var peoplepickerProperties = (typeof properties === "undefined") ? {} : properties;
+    var elementPeople = document.querySelectorAll("[speed-bind-people]");
+    speedContext.peopleDictionary.total = elementPeople.length;
+    for (var i = 0; i <= (elementPeople.length - 1); i++) {
+        var property = elementPeople[i].getAttribute("speed-bind-people");
+        var elementId = elementPeople[i].id;
+
+        var pickerProperties = (typeof peoplepickerProperties["All"] === "undefined") ? {} : peoplepickerProperties["All"];
+        pickerProperties = (typeof peoplepickerProperties[property] === "undefined") ? pickerProperties : peoplepickerProperties[property];
+
+        speedContext.initializePeoplePicker(elementId, pickerProperties, function (peoplepickerDictionary, elementId) {
+            speedContext.peopleDictionary.count++;
+            var elementProperty = document.getElementById(elementId).getAttribute("speed-bind-people");
+            speedContext.peopleDictionary.picker[elementProperty] = peoplepickerDictionary;
+            if (speedContext.peopleDictionary.count === speedContext.peopleDictionary.total && typeof callback === "function") {
+                callback(speedContext.peopleDictionary.picker);
+            }
+        });
+    }
+}
+
 /**
  * The getUsersFromPicker function gets users from a people picker synchronously
  * @import SP.clientpeoplepicker.js is required
@@ -1993,9 +3355,7 @@ Speed.prototype.getUsersFromPicker = function (peoplePickerControl) {
     var userManager = null;
     try {
         userManager = people.GetAllUserInfo();
-    }
-    catch (e) {
-    }
+    } catch (e) {}
     return userManager;
 }
 
@@ -2017,7 +3377,7 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
     var userManager = people.GetAllUserInfo();
     if (!jQuery.isEmptyObject(userManager)) {
         // Get the first user's ID by using the login name.
-        for (var x = 0; x <= (userManager.length - 1) ; x++) {
+        for (var x = 0; x <= (userManager.length - 1); x++) {
             window.speedGlobal.push(ctx.get_web().ensureUser(userManager[x].Key));
             var total = window.speedGlobal.length;
             total--;
@@ -2030,8 +3390,7 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
                 onSuccess(userDetails);
             }, 1500),
             Function.createDelegate(this, onFailedCall));
-    }
-    else onSuccess(null);
+    } else onSuccess(null);
 }
 
 /**
@@ -2039,16 +3398,12 @@ Speed.prototype.getUsersFromPickerAsync = function (peoplePickerControl, onSucce
  * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} peoplePickerObj this parameter provides the people picker dictionary object which the user will be set
  * @param {String} userLogin this parameter provides the login of the user that will be set
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the pickerDictionaryObj can be obtained when creating a people picker using initializePeoplePicker. it is returned as an argument in the callback
- * speedCtx.setPeoplePickerValue(pickerDictionaryObj, "sptest");
  */
 Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
-    var peoplePicker = peoplePickerObj
-    var usrObj = { 'Key': userLogin };
+    var peoplePicker = peoplePickerObj;
+    var usrObj = {
+        'Key': userLogin
+    };
     peoplePicker.AddUnresolvedUser(usrObj, true);
 }
 
@@ -2056,11 +3411,6 @@ Speed.prototype.setPeoplePickerValue = function (peoplePickerObj, userLogin) {
  * The clearPicker function clears the value of a people picker
  * @import SP.clientpeoplepicker.js is required
  * @param {SP.ClientPeopleDictionary} people this parameter provides the people picker dictionary object which is to be cleared
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the pickerDictionaryObj can be obtained when creating a people picker using initializePeoplePicker. it is returned as an argument in the callback
- * speedCtx.clearPicker(pickerDictionaryObj);
  */
 Speed.prototype.clearPicker = function (people) {
     //var people = this.SPClientPeoplePicker.SPClientPeoplePickerDict['relievee_TopSpan'];
@@ -2078,27 +3428,25 @@ Speed.prototype.clearPicker = function (people) {
 /**
  * The currentUserDetailsSync function gets current logged in user details synchronously
  * @returns {Object} returns an object with the following properties: id,fullLogin,login,isAdmin,email,title
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * var userProperties = speedCtx.currentUserDetails();
  */
 Speed.prototype.currentUserDetailsSync = function () {
-    var CurrentUserProperties = {};
-    CurrentUserProperties.id = _spPageContextInfo.userId;
-    CurrentUserProperties.fullLogin = _spPageContextInfo.userLoginName;
-    CurrentUserProperties.login = _spPageContextInfo.userLoginName.SPLoginFromFullLogin();
-    CurrentUserProperties.isAdmin = _spPageContextInfo.isSiteAdmin;
-    try{
+    var CurrentInlineUserProperties = {};
+    CurrentInlineUserProperties.id = _spPageContextInfo.userId;
+    CurrentInlineUserProperties.fullLogin = _spPageContextInfo.userLoginName;
+    CurrentInlineUserProperties.isAdmin = _spPageContextInfo.isSiteAdmin;
+    try {
         //this block will work for o365
-        CurrentUserProperties.email = _spPageContextInfo.userEmail;
-        CurrentUserProperties.title = _spPageContextInfo.userDisplayName;
-    }
-    catch(e){
+        CurrentInlineUserProperties.login = _spPageContextInfo.userLoginName;
+        CurrentInlineUserProperties.email = _spPageContextInfo.userEmail;
+        CurrentInlineUserProperties.title = _spPageContextInfo.userDisplayName;
+    } catch (e) {
         //this block will parse is its onPremise
-        CurrentUserProperties.email = null;
-        CurrentUserProperties.title = null;
+        CurrentInlineUserProperties.login = _spPageContextInfo.userLoginName.SPLoginFromFullLogin();
+        CurrentInlineUserProperties.email = null;
+        CurrentInlineUserProperties.title = null;
     }
+
+    return CurrentInlineUserProperties;
 };
 
 /**
@@ -2107,14 +3455,6 @@ Speed.prototype.currentUserDetailsSync = function () {
  * this argument can be used to retrieve details of the current user
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
- * speedCtx.currentUserDetailsAsync(function(SPUserObject){
- *      //here we are just getting the title of the current user
- *      var userID = SPUserObject.get_title();
- * });
  */
 
 Speed.prototype.currentUserDetails = function (callback, onFailed) {
@@ -2136,14 +3476,6 @@ Speed.prototype.currentUserDetails = function (callback, onFailed) {
  * which contains the properties of the user
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
- * speedCtx.getUserById(1, function(SPUserObject){
- *      //here we are just getting the title of the retrieved user
- *      var userID = SPUserObject.get_title();
- * });
  */
 Speed.prototype.getUserById = function (usId, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2158,14 +3490,13 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
         window.speedGlobal.push(intervalCount);
         var total = window.speedGlobal.length;
         total--;
-        
+
         var intervalRef = setInterval(function () {
             try {
                 var userId = ccbUser.get_id();
                 clearInterval(intervalRef);
                 callback(ccbUser);
-            }
-            catch (e) {
+            } catch (e) {
                 window.speedGlobal[total] = parseInt(window.speedGlobal[total]) + 1;
                 if (window.speedGlobal[total] == 10) {
                     clearInterval(intervalRef);
@@ -2184,15 +3515,6 @@ Speed.prototype.getUserById = function (usId, callback, onFailed) {
  * which contains the properties of the user
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument SPUserObject is the SP.User object return from the callback, you can give it any name it will still represent the same SP.User object
- * speedCtx.getUserByLoginName("shris.com", function(SPUserObject){
- *      //here we are just getting the title of the retrieved user
- *      var userID = SPUserObject.get_title();
- * });
  */
 Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2212,8 +3534,7 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
                 var userId = userObject.get_id();
                 clearInterval(intervalRef);
                 onSuccess(userObject);
-            }
-            catch (e) {
+            } catch (e) {
                 window.speedGlobal[total] = parseInt(window.speedGlobal[total]) + 1;
                 if (window.speedGlobal[total] == 10) {
                     clearInterval(intervalRef);
@@ -2221,7 +3542,7 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
                 }
             }
         }, 1000);
-    },Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -2230,15 +3551,6 @@ Speed.prototype.getUserByLoginName = function (loginName, onSuccess, onFailed) {
  * @param {callback(SP.UserProfileProperties)} callback this parameter is the call back function when the function is successful, 
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument SPUserProperties is the SP.UserProperties object return from the callback, you can give it any name it will still represent the same SPUserProperties object.
- * this property contains all the information of the current user in relation to the UserProperties column
- * speedCtx.getCurrentUserProperties(function(SPUserProperties){
- *      //here we are just getting the department of the retrieved user
- *      var department = SPUserProperties.get_userProfileProperties()['Department'];
- * });
  */
 Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2261,15 +3573,6 @@ Speed.prototype.getCurrentUserProperties = function (callback, onFailed) {
  * in respect to the properties retrieved.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument SPUserProperties is the value of the sp user properties specified
- * speedCtx.getSpecificUserProperties("s.jacob@test.com",["SPS-JobTitle","Department"],function(SPUserProperties){
- *      //here we are just getting the jobtitle and department of the retrieved user
- *      var jobtitle = SPUserProperties[0];
- *      var department = SPUserProperties[1];
- * });
  */
 Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyNames, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2297,19 +3600,20 @@ Speed.prototype.getSpecificUserProperties = function (acctname, profilePropertyN
 /**
  * The createSPGroup function creates a sharepoint group
  * @param {String} title the name of the group you want to create
- * @param {String} description the brief description of the list
  * @param {object} properties the group properties object
  * @param {function} callback this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  */
-Speed.prototype.createSPGroup = function (title, description, properties, callback, onFailed) {
+Speed.prototype.createSPGroup = function (title, properties, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     var assignDefinition = (typeof properties.assigndefinition !== 'undefined') ? properties.assigndefinition : false;
     var roleDefinition = (typeof properties.roledefinition !== 'undefined') ? properties.roledefinition : null;
 
     var allowMemberEdit = (typeof properties.allowMembersEdit !== 'undefined') ? properties.allowMembersEdit : false;
     var everyoneView = (typeof properties.everyone !== 'undefined') ? properties.everyone : false;
+
+    var description = (typeof properties.description !== 'undefined') ? properties.description : "";
 
     var callbackFunction = (typeof properties === 'function') ? properties : callback;
     if (typeof properties === 'function' && typeof callback === 'function') {
@@ -2399,9 +3703,65 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
             users.push(prop);
         }
         callback(users);
-    }
-    , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
+
+/**
+ * The retrieveAllUsersInSite function gets all users in a the sharepoint site collection
+ * @param {callback(Array)} callback this parameter is the call back function when the function is successful,an array of object with properties title,id,email,login. 
+ * the enumeration of the userCollection object has taken care of.
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ */
+Speed.prototype.retrieveAllUsersInSite = function (callback, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
+    var clientContext = this.initiate();
+    var collUsers = clientContext.get_web().get_siteUsers();
+    window.speedGlobal.push(collUsers);
+    var total = window.speedGlobal.length;
+    total--;
+    clientContext.load(window.speedGlobal[total]);
+    clientContext.executeQueryAsync(function () {
+        var users = [];
+        var userEnumerator = window.speedGlobal[total].getEnumerator();
+        while (userEnumerator.moveNext()) {
+            var prop = {};
+            var oUser = userEnumerator.get_current();
+            prop.title = oUser.get_title();
+            prop.id = oUser.get_id();
+            prop.email = oUser.get_email();
+            prop.login = oUser.get_loginName();
+            users.push(prop);
+        }
+
+        callback(users);
+    }, Function.createDelegate(this, onFailedCall));
+}
+
+
+/**
+ * The SPGroupDetails function gets information about a sharepoint group
+ * @param {String} group the group to obtain details from
+ * @param {callback(enumerator)} callback this parameter is the call back function when the function is successful
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ */
+Speed.prototype.SPGroupDetails = function (group, callback, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
+    var clientContext = this.initiate();
+    var collGroup = clientContext.get_web().get_siteGroups();
+    var oGroup = collGroup.getByName(group);
+    window.speedGlobal.push(oGroup);
+    var total = window.speedGlobal.length;
+    total--;
+    clientContext.load(window.speedGlobal[total]);
+    clientContext.executeQueryAsync(function () {
+        setTimeout(function () {
+            callback(window.speedGlobal[total]);
+        }, 1000);
+    }, Function.createDelegate(this, onFailedCall));
+}
+
 //-----------reterieve all users in a group 2013----------
 /**
  * The allUsersInGroup function gets all users in a sharepoint group
@@ -2412,7 +3772,6 @@ Speed.prototype.retrieveAllUsersInGroup = function (group, callback, onFailed) {
  */
 Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
-    var users = [];
     var clientContext = this.initiate();
     var collGroup = clientContext.get_web().get_siteGroups();
     var oGroup = collGroup.getByName(group);
@@ -2424,8 +3783,7 @@ Speed.prototype.allUsersInGroup = function (group, callback, onFailed) {
         setTimeout(function () {
             callback(window.speedGlobal[total]);
         }, 1000);
-    }
-    , Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -2444,23 +3802,23 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
     var allGroups = currentWeb.get_siteGroups();
     context.load(allGroups);
     context.executeQueryAsync(
-       function () {
-           var count = allGroups.get_count();
-           for (var i = 0; i <= (parseInt(count) - 1) ; i++) {
-               var grp = allGroups.getItemAtIndex(i);
-               //provide your group name
-               if (grp.get_loginName() == groupName) {
-                   window.speedGlobal.push(grp.get_users());
-                   var total = window.speedGlobal.length;
-                   total--;
-                   //load users of the group
-                   context.load(window.speedGlobal[total]);
-                   context.executeQueryAsync(function () {
-                        callback(window.speedGlobal[total]);  
-                   }, Function.createDelegate(this, onFailedCall));
-               }
-           }
-       }, Function.createDelegate(this, onFailedCall));
+        function () {
+            var count = allGroups.get_count();
+            for (var i = 0; i <= (parseInt(count) - 1); i++) {
+                var grp = allGroups.getItemAtIndex(i);
+                //provide your group name
+                if (grp.get_loginName() == groupName) {
+                    window.speedGlobal.push(grp.get_users());
+                    var total = window.speedGlobal.length;
+                    total--;
+                    //load users of the group
+                    context.load(window.speedGlobal[total]);
+                    context.executeQueryAsync(function () {
+                        callback(window.speedGlobal[total]);
+                    }, Function.createDelegate(this, onFailedCall));
+                }
+            }
+        }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -2470,17 +3828,6 @@ Speed.prototype.allUsersInGroup2010 = function (groupName, callback, onFailed) {
  * an array of object with properties title,id,email,login. the enumeration of the userCollection object has taken care of.
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * the argument userArray in the callback contains the following properties: title, id, email, login
- * speedCtx.retrieveMultipleGroupUsers("HR Admin;Legal",function(userArray){
- *      //here we are just getting the jobtitle and department of the retrieved user
- *      for(var x = 0; x <= (userArray.length - 1); x++){
- *          var username = userArray[x].title;
- *      }
- * });
  */
 Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2489,8 +3836,8 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
     if (typeof groupCollection !== 'undefined') {
         var groupFound = 0;
         var groupsAvail = false;
-        var groupNames = groupCollection.split(";");
-        for (var i = 0; i <= (groupNames.length - 1) ; i++) {
+        var groupNames = (typeof groupCollection === "string") ? groupCollection.split(";") : groupCollection;
+        for (var i = 0; i <= (groupNames.length - 1); i++) {
             groupsAvail = true;
             var clientContext = this.initiate();
             var collGroup = clientContext.get_web().get_siteGroups();
@@ -2513,7 +3860,7 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
                         prop.email = oUser.get_email();
                         prop.login = oUser.get_loginName();
                         var userExist = false
-                        for (var y = 0; y <= (users.length - 1) ; y++) {
+                        for (var y = 0; y <= (users.length - 1); y++) {
                             if (users[y].logon == prop.logon) {
                                 userExist = true;
                                 break;
@@ -2526,15 +3873,13 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
                     if (groupFound == groupNames.length)
                         callback(users);
                 }, 1500);
-            }
-            , Function.createDelegate(this, onFailedCall));
+            }, Function.createDelegate(this, onFailedCall));
         }
         //callback called if no group was foud
         if (groupFound == 0 && !groupsAvail) {
             callback(users);
         }
-    }
-    else {
+    } else {
         throw "group collection is undefined";
     }
 }
@@ -2563,7 +3908,7 @@ Speed.prototype.retrieveMultipleGroupUsers = function (groupCollection, callback
  */
 Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
-    var returnUsers = (typeof userDetails.returnCollection === "undefined") ? false : userDetails.returnCollection;
+    var returnUsers = (typeof userDetails.returnCollection === "undefined") ? true : userDetails.returnCollection;
     var emailCollection = (typeof userDetails.groupEmails === "undefined") ? false : userDetails.groupEmails;
     var boolVal = false;
     var globalContextCount = [];
@@ -2571,7 +3916,7 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
     if (typeof groupCollection !== 'undefined') {
         var groupFound = 0;
         var groupsAvail = false;
-        var groupNames = groupCollection.split(";");
+        var groupNames = (typeof groupCollection === "string") ? groupCollection.split(";") : groupCollection;
         var clientContext = this.initiate();
         var collGroup = clientContext.get_web().get_siteGroups();
         for (var i = 0; i <= (groupNames.length - 1); i++) {
@@ -2590,93 +3935,96 @@ Speed.prototype.isUserMemberOfGroup = function (groupCollection, userDetails, ca
             globalContextCount.push(total);
             clientContext.load(window.speedGlobal[total]);
             clientContext.executeQueryAsync(function () {
-                setTimeout(function () {
-                    var totalToUse = globalContextCount[groupFound];
-                    
-                    var userEnumerator = window.speedGlobal[totalToUse].getEnumerator();
-                    while (userEnumerator.moveNext()) {
-                        var prop = {};
-                        var oUser = userEnumerator.get_current();
-                        prop.title = oUser.get_title();
-                        prop.id = oUser.get_id();
-                        prop.email = oUser.get_email();
-                        prop.login = oUser.get_loginName();
-                        if (typeof userDetails.login !== "undefined") {
-                            if (prop.login === userDetails.login) {
-                                boolVal = true;
-                                usersArray[groupNames[groupFound]].belongs = true;
-                                if(!returnUsers)
-                                    break;
-                            }
-                        }
-                        else if (typeof userDetails.id !== "undefined") {
-                            if (prop.id === userDetails.id) {
-                                boolVal = true;
-                                usersArray[groupNames[groupFound]].belongs = true;
-                                if(!returnUsers)
-                                    break;
-                            }
-                        }
-                        else if (typeof userDetails.email !== "undefined") {
-                            if (prop.email === userDetails.email) {
-                                boolVal = true;
-                                usersArray[groupNames[groupFound]].belongs = true;
-                                if(!returnUsers)
-                                    break;
-                            }
-                        }
+                //========================
+                var intervalCount = 0
+                window.speedGlobal.push(intervalCount);
+                var total = window.speedGlobal.length;
+                total--;
+                var intervalRef = setInterval(function () {
+                    try {
+                        var totalToUse = globalContextCount[groupFound];
 
-                        if (returnUsers) {
-                            usersArray[groupNames[groupFound]].users.push(prop);
-                            if (emailCollection) {
-                                if (prop.email !== "" && $.inArray(prop.email, usersArray[groupNames[groupFound]].emails) < 0)
-                                    usersArray[groupNames[groupFound]].emails.push(prop.email);
+                        var userEnumerator = window.speedGlobal[totalToUse].getEnumerator();
+                        while (userEnumerator.moveNext()) {
+                            var prop = {};
+                            var oUser = userEnumerator.get_current();
+                            prop.title = oUser.get_title();
+                            prop.id = oUser.get_id();
+                            prop.email = oUser.get_email();
+                            prop.login = oUser.get_loginName();
+                            if (typeof userDetails.login !== "undefined") {
+                                if (prop.login === userDetails.login) {
+                                    boolVal = true;
+                                    usersArray[groupNames[groupFound]].belongs = true;
+                                    if (!returnUsers)
+                                        break;
+                                }
+                            } else if (typeof userDetails.id !== "undefined") {
+                                if (prop.id === userDetails.id) {
+                                    boolVal = true;
+                                    usersArray[groupNames[groupFound]].belongs = true;
+                                    if (!returnUsers)
+                                        break;
+                                }
+                            } else if (typeof userDetails.email !== "undefined") {
+                                if (prop.email === userDetails.email) {
+                                    boolVal = true;
+                                    usersArray[groupNames[groupFound]].belongs = true;
+                                    if (!returnUsers)
+                                        break;
+                                }
+                            }
+
+                            if (returnUsers) {
+                                usersArray[groupNames[groupFound]].users.push(prop);
+                                if (emailCollection) {
+                                    if (prop.email !== "" && $.inArray(prop.email, usersArray[groupNames[groupFound]].emails) < 0)
+                                        usersArray[groupNames[groupFound]].emails.push(prop.email);
+                                }
+                            } else {
+                                usersArray = {};
                             }
                         }
-                        else {
-                            usersArray = {};
+                        groupFound++;
+                        clearInterval(intervalRef);
+                        if (groupFound == groupNames.length || (boolVal && !returnUsers))
+                            callback(boolVal, usersArray);
+                    } catch (e) {
+                        window.speedGlobal[total] = parseInt(window.speedGlobal[total]) + 1;
+                        if (window.speedGlobal[total] == 10) {
+                            clearInterval(intervalRef);
+                            throw "User properties is not available check server resources";
                         }
                     }
-                    groupFound++;
-                    if (groupFound == groupNames.length || (boolVal && !returnUsers))
-                        callback(boolVal, usersArray);
-                }, 1500);
-            }
-                , Function.createDelegate(this, onFailedCall));
+                }, 1000);
+            }, Function.createDelegate(this, onFailedCall));
         }
         //callback called if no group was foud
         if (groupFound == 0 && !groupsAvail) {
-            callback(boolVal,usersArray);
+            callback(boolVal, usersArray);
         }
-    }
-    else {
+    } else {
         throw "group collection is undefined";
     }
 }
 
 /**
- * The isUserMemberOfGroup function checks if the current user belongs to a set of groups (";") seperated. 
+ * The isCurrentUserMemberOfGroup function checks if the current user belongs to a set of groups (";") seperated. 
  * @param {String} groupCollection the groups which users will be retrieved from. the groups are (;) seperated
  * @param {callback(boolean)} callback this parameter is the call back function when the function is successful.
  * Boolean value ,true means user belongs to the group collection, false means user doesn't belong to the group collection 
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * isUser is a boolean
- * speedCtx.isCurrentUserMemberOfGroup("HR Admin;Legal",function(isUser){
- *      console.log(isUser);
- * });
  */
 Speed.prototype.isCurrentUserMemberOfGroup = function (groupCollection, callback, onFailed) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
     if (typeof groupCollection !== 'undefined') {
-        var groupNames = groupCollection.split(";");
+        var groupNames = (typeof groupCollection === "string") ? groupCollection.split(";") : groupCollection;
         var hashGroups = {};
         for (var i = 0; i <= (groupNames.length - 1); i++) {
-            hashGroups[groupNames[i]] = i;
+            if (groupNames[i] !== "") {
+                hashGroups[groupNames[i]] = i;
+            }
         }
 
         var clientContext = this.initiate();
@@ -2685,21 +4033,67 @@ Speed.prototype.isCurrentUserMemberOfGroup = function (groupCollection, callback
 
         var userGroups = currentUser.get_groups();
         clientContext.load(userGroups);
-        clientContext.executeQueryAsync(function(){
+        clientContext.executeQueryAsync(function () {
             var isMember = false;
+            var groupName = "";
             var groupsEnumerator = userGroups.getEnumerator();
             while (groupsEnumerator.moveNext()) {
-                var group = groupsEnumerator.get_current();               
-                var hasValue = hashGroups[group.get_title()];
-                if(typeof hasValue !== "undefined"){
+                var group = groupsEnumerator.get_current();
+                groupName = group.get_title();
+                var hasValue = hashGroups[groupName];
+                if (typeof hasValue !== "undefined") {
                     isMember = true;
                     break;
                 }
             }
-            callback(isMember);
-        },onFailedCall);
+
+            if (!isMember) {
+                groupName = groupCollection;
+            }
+            callback(isMember, groupName);
+        }, onFailedCall);
+    } else {
+        throw "group collection is undefined";
     }
-    else{
+}
+
+/**
+ * The matchNameWithUserGroup function confirms if a user belong to a group by returning the Name of the Group in an array. 
+ * @param {Array} groupCollection the groups which users will be retrieved from.
+ * @param {boolean} allCollection only match one group.
+ * @param {callback(array)} callback this parameter is the call back function when the function is successful.
+ * Boolean value ,true means user belongs to the group collection, false means user doesn't belong to the group collection 
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ */
+Speed.prototype.matchNameWithUserGroup = function (groupCollection, allCollection, callback, onFailed) {
+    var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
+    if (typeof groupCollection !== 'undefined') {
+        var returnGroups = [];
+        var clientContext = this.initiate();
+        var currentUser = clientContext.get_web().get_currentUser();
+        clientContext.load(currentUser);
+
+        var userGroups = currentUser.get_groups();
+        clientContext.load(userGroups);
+        clientContext.executeQueryAsync(function () {
+            var groupsEnumerator = userGroups.getEnumerator();
+            while (groupsEnumerator.moveNext()) {
+                var group = groupsEnumerator.get_current();
+                var groupName = group.get_title();
+                for (var i = 0; i < groupCollection.length; i++) {
+                    if (groupCollection[i].toLowerCase() === groupName.toLowerCase()) {
+                        returnGroups.push(groupCollection[i]);
+                        break;
+                    }
+                }
+                if (!allCollection && returnGroups.length === 1) {
+                    break;
+                }
+            }
+            callback(returnGroups);
+        }, onFailedCall);
+    } else {
         throw "group collection is undefined";
     }
 }
@@ -2723,6 +4117,70 @@ Speed.prototype.convertDataURIToBinary = function (dataURI) {
     }
     return array;
 }
+
+/**
+ * The convertArrayBufferToBinary function converts Uint8Array to byte string
+ * @param {string} data this parameter provides datauri string
+ * @returns {string} the byte string used for chunk uploading
+ */
+Speed.prototype.convertArrayBufferToBinary = function (data) {
+    var fileData = '';
+    var byteArray = new Uint8Array(data);
+    for (var i = 0; i < byteArray.byteLength; i++) {
+        fileData += String.fromCharCode(byteArray[i]);
+    }
+    return fileData;
+}
+
+/**
+ * The getItem function retrieve rows for a specified list in the context used
+ * @param {String} listName this parameter specifices the list which the rows are to be retrieved
+ * @param {String} albumLink this parameter specifices the folder url in the context where the documents are to be obtained 
+ * @param {String} caml this parameter specifices the caml query to be used for the list
+ * @param {callback(enumerator)} onSuccess this parameter is the call back function thats called when the rows has successfully been retrieved, SP.Item object is returned as
+ * an argument to the callback function
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.getDocumentsInFolder = function (listName, albumLink, caml, onSuccess, onFailed, appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var camlQuery = SP.CamlQuery.createAllItemsQuery();
+    camlQuery.set_folderServerRelativeUrl(albumLink);
+    var query = (typeof caml === '' || caml == null) ? camlQuery : caml;
+    var context = this.initiate();
+    var oList = context.get_web().get_lists().getByTitle(listName);
+
+    window.speedGlobal.push(oList.getItems(query));
+    var total = window.speedGlobal.length;
+    total--;
+    if (typeof appContext !== 'undefined') {
+        context = appContext.initiate();
+    }
+    context.load(window.speedGlobal[total], 'Include(Title, ContentType, File)');
+    //window.speedGlobal[total].ListName = listName;
+    context.executeQueryAsync(function () {
+        setTimeout(function () {
+            var items = [];
+            var ListEnumerator = window.speedGlobal[total].getEnumerator();
+            while (ListEnumerator.moveNext()) {
+                var documents = {};
+                var currentItem = ListEnumerator.get_current();
+                var _contentType = currentItem.get_contentType();
+                if (_contentType.get_name() != 'Folder') {
+                    var File = currentItem.get_file();
+                    if (File != null) {
+                        documents.title = currentItem.get_item('Title');
+                        documents.url = File.get_serverRelativeUrl();
+                    }
+                }
+                items.push(documents);
+            }
+            onSuccess(items);
+        }, 1000);
+    }, Function.createDelegate(this, onFailedCall));
+}
+
 //------------------create a folder in document Libary---------
 /**
  * The createFolder function creates a folder in a document library
@@ -2733,14 +4191,6 @@ Speed.prototype.convertDataURIToBinary = function (dataURI) {
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * 
- * speedCtx.createFolder("Speedfolder","Documents",function(folderProperties){
- *      console.log("Folder Created Successfully");
- * });
  */
 Speed.prototype.createFolder = function (foldername, library, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
@@ -2765,20 +4215,103 @@ Speed.prototype.createFolder = function (foldername, library, onSuccess, onFaile
 }
 
 /**
+ * The createSubFolder function creates a folder and subfolders in a document library
+ * @param {Array} foldernames an array of folder names. the order determines the order of the creation of subfolders
+ * @param {String} library the title of the library which the folder will be created
+ * @param {callback(number)} feedBack this parameter is the call back function to determine the upload rate based on percentage
+ * @param {callback(folderCollection)} onSuccess this parameter is the call back function when the function is successful, a SP.FolderCollection object is returned
+ * as an argument.
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {SP.context} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.createSubFolder = function (foldernames, library, metadata, feedBack, onSuccess, onFailed, appContext) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var context = this.initiate();
+    var docLib = context.get_web().get_lists().getByTitle(library);
+    var rootFolder = docLib.get_rootFolder();
+    var folderUrl = speedContext.initiate().get_url();
+    folderUrl += "/" + library;
+    checkFolderExists(rootFolder, folderUrl, foldernames, 0, metadata)
+
+    function checkFolderExists(folderContext, urloffolder, folderNames, count, metadata) {
+        speedContext.getFileFolderExists(urloffolder, 'folder', function () {
+            urloffolder += "/" + folderNames[count];
+
+            window.speedGlobal.push(folderContext.get_folders().add(folderNames[count]));
+            var total = window.speedGlobal.length;
+            total--;
+            if (typeof appContext !== 'undefined') {
+                context = appContext.initiate();
+            }
+            context.load(window.speedGlobal[total]);
+            context.executeQueryAsync(function () {
+                var folder = folderNames[count];
+                if (typeof metadata[folder] !== "undefined") {
+                    var itemCollection = window.speedGlobal[total].get_listItemAllFields();
+                    for (var propName in metadata[folder]) {
+                        if (propName.toLowerCase() != "id") {
+                            itemCollection.set_item(propName, metadata[folder][propName]);
+                        }
+                    }
+                    itemCollection.update();
+                    context.load(itemCollection);
+                    context.executeQueryAsync(function () {
+                        setTimeout(function () {
+                            if (count < (folderNames.length - 1)) {
+                                var totalFolder = folderNames.length;
+                                var newNumber = parseInt(count) + 1;
+                                var completed = (newNumber / totalFolder) * 100;
+                                feedBack(parseInt(completed));
+                                count++;
+                                checkFolderExists(window.speedGlobal[total], urloffolder, folderNames, count, metadata);
+                            } else {
+                                feedBack(100);
+                                onSuccess(urloffolder);
+                            }
+                        }, 1000);
+                    }, Function.createDelegate(this, onFailedCall));
+                } else {
+                    setTimeout(function () {
+                        if (count < (folderNames.length - 1)) {
+                            var totalFolder = folderNames.length;
+                            var newNumber = parseInt(count) + 1;
+                            var completed = (newNumber / totalFolder) * 100;
+                            feedBack(parseInt(completed));
+                            count++;
+                            checkFolderExists(window.speedGlobal[total], urloffolder, folderNames, count, metadata);
+                        } else {
+                            feedBack(100);
+                            onSuccess(urloffolder);
+                        }
+                    }, 1000);
+                }
+            }, Function.createDelegate(this, onFailedCall));
+        }, function (sender, args) {
+            urloffolder += "/" + folderNames[count];
+            if (count < (folderNames.length - 1)) {
+                var totalFolder = folderNames.length;
+                var newNumber = parseInt(count) + 1;
+                var completed = (newNumber / totalFolder) * 100;
+                feedBack(parseInt(completed));
+                count++;
+                checkFolderExists(folderContext, urloffolder, folderNames, count, metadata);
+            } else {
+                feedBack(100);
+                onSuccess(urloffolder);
+            }
+        });
+    }
+}
+
+/**
  * The deleteFolderOrFile function deletes folder from Libary
  * @param {String} folderDocUrl the url of the folder or file that needs to be deleted
  * @param {callback} onSuccess this parameter is the call back function when the function is successful
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * 
- * speedCtx.deleteFolderOrFile("/testsite/Documents",function(){
- *      console.log("Folder/File deleted Successfully");
- * }); 
  */
 Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined') ? this.errorHandler : onFailed;
@@ -2802,7 +4335,7 @@ Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed
 }
 //------------------------upload file to documnet library---------------------
 /**
- * The uploadFile function uploades a file to a folder in a Libary or directly to a library itself
+ * The uploadFile function upload a file to a folder in a Libary or directly to a library itself
  * @param {String} nameOfFile the name of the file to be uploaded
  * @param {String} dataOfFile the dataURI of the file
  * @param {String} folder the folder where the file will be uploaded
@@ -2811,35 +4344,35 @@ Speed.prototype.deleteFolderOrFile = function (folderDocUrl, onSuccess, onFailed
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * 
- * speedCtx.uploadFile("testfile","data64string(test)", "/testsite/documents/",function(fileProperties){
- *      console.log("Folder/File uploaded Successfully");
- * });
  */
 Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var ctx2 = this.initiate();
     var fileNameSplit = nameOfFile.split(".");
     var filetype = fileNameSplit.pop();
-    if (filetype.toLowerCase() != "txt")
-        var data = this.convertDataURIToBinary(dataOfFile);
-    else
-        var data = dataOfFile;
+
+    if (dataOfFile !== null) {
+        if (filetype.toLowerCase() != "txt")
+            var data = this.convertDataURIToBinary(dataOfFile);
+        else
+            var data = dataOfFile;
+    }
+
     var attachmentFolder = ctx2.get_web().getFolderByServerRelativeUrl(folder);
     var fileCreateInfo = new SP.FileCreationInformation();
     fileCreateInfo.set_url(nameOfFile);
     fileCreateInfo.set_overwrite(true);
     fileCreateInfo.set_content(new SP.Base64EncodedByteArray());
-    for (var i = 0; i < data.length; ++i) {
-        if (filetype.toLowerCase() != "txt")
-            fileCreateInfo.get_content().append(data[i]);
-        else
-            fileCreateInfo.get_content().append(data.charCodeAt(i));
+
+    if (dataOfFile !== null) {
+        for (var i = 0; i < data.length; ++i) {
+            if (filetype.toLowerCase() != "txt")
+                fileCreateInfo.get_content().append(data[i]);
+            else
+                fileCreateInfo.get_content().append(data.charCodeAt(i));
+        }
     }
+
     window.speedGlobal.push(attachmentFolder.get_files().add(fileCreateInfo));
     var total = window.speedGlobal.length;
     total--;
@@ -2854,9 +4387,30 @@ Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, onSuccess
     }, Function.createDelegate(this, onFailedCall));
 }
 
+/**
+ * The uploadLargeFile function upload a larger file (> 1.8mb) to a folder in a Libary or directly to a library itself.This is basically used to overcome the restrictions 
+ * of file upload on o365 server.
+ * @param {String} fileName the name of the file to be uploaded
+ * @param {String} folderUrl the folder where the file will be uploaded
+ * @param {Speed.filesDictionary} uploadedFile the file data and its properties. 
+ * @param {callback(SP.File)} onSuccess this parameter is the call back function when the upload is successful. The SP.File object is returned as an argument
+ * when the upload is successful.
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {string} webAbsoluteUrl the absolute url of where the folder in which the file will be uploaded to resides.by default the current site url is used
+ */
+Speed.prototype.uploadLargeFile = function (fileName, folderUrl, uploadedFile, onSuccess, onFailed, webAbsoluteUrl, appContext) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    //upload dummy file
+    this.uploadFile(fileName, "", folderUrl, function (filedetails) {
+        speedContext.prepareChunkFile(uploadedFile, filedetails, 0, onSuccess, onFailedCall, webAbsoluteUrl);
+    }, onFailedCall, appContext);
+}
+
 //=========================upload multiple files ===============================
 /**
- * The uploadFile function uploades a file to a folder in a Libary or directly to a library itself
+ * The uploadMultipleFiles function upload files to a folder in a Libary or directly to a library itself
  * @param {String} fileArr an array of file objects with properties dataName & dataURI
  * @param {String} folderUrl the folder url where the files will be uploaded to
  * @param {String} fileCount the index of the file object to start in the array
@@ -2866,18 +4420,9 @@ Speed.prototype.uploadFile = function (nameOfFile, dataOfFile, folder, onSuccess
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
- * 
- * @example
- * // returns a normal context related to the current site
- * var speedCtx = new Speed();
- * 
- * speedCtx.uploadMultipleFiles([{dataName: "testdoc.doc", dataURI: 'data64string' ], "/testsite/documents/",0,function(uploadStatus,fileDetails){
- *      console.log(uploadStatus + "%");
- * },function(){
- *      console.log("All files uploaded successfully");
- * });
  */
 Speed.prototype.uploadMultipleFiles = function (fileArr, folderUrl, fileCount, feedBack, onSuccess, onFailed, appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var speedContext = this;
     speedContext.uploadFile(fileArr[fileCount].dataName, fileArr[fileCount].dataURI, folderUrl, function (fileDetails) {
         var totalFiles = fileArr.length;
@@ -2886,11 +4431,177 @@ Speed.prototype.uploadMultipleFiles = function (fileArr, folderUrl, fileCount, f
         feedBack(parseInt(completed), fileDetails);
         if (completed == 100) {
             onSuccess();
-        }
-        else {
+        } else {
             speedContext.uploadMultipleFiles(fileArr, folderUrl, newNumber, feedBack, onSuccess, onFailed, appContext);
         }
-    }, onFailed, appContext);
+    }, onFailedCall, appContext);
+}
+
+/**
+ * The uploadMultipleLargeFile function uploads large files to a folder in a Libary or directly to a library itself. The Method is optimized as it uses the 
+ * uploadLargeFile method only if the file is greater than 1.8MB
+ * @param {String} fileArr an array of file objects with properties dataName & dataURI
+ * @param {String} folderUrl the folder url where the files will be uploaded to
+ * @param {String} fileCount the index of the file object to start in the array
+ * @param {callback(percentCompleted,SP.File)} feedBack the feedback function is called after each file has been uploaded successfully. It returns to arguments, the 
+ * first argument show the percentage of files that have been uploaded successfully, while the second argument contains the SP.FIle object of the currently uploaded file.
+ * @param {callback} onSuccess this parameter is the call back function when all the files have been uploaded successfully
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {string} webAbsoluteUrl the absolute url of where the folder in which the file will be uploaded to resides.by default the current site url is used
+ */
+Speed.prototype.uploadMultipleLargeFile = function (fileArr, folderUrl, fileCount, feedBack, onSuccess, onFailed, webAbsoluteUrl, appContext) {
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var speedContext = this;
+    if (fileArr[fileCount].dataType.toLowerCase() === "arraybuffer") {
+        speedContext.uploadLargeFile(fileArr[fileCount].dataName, folderUrl, fileArr[fileCount], function (fileDetails) {
+            var totalFiles = fileArr.length;
+            var newNumber = parseInt(fileCount) + 1;
+            var completed = (newNumber / totalFiles) * 100;
+            feedBack(parseInt(completed), fileDetails);
+            if (completed == 100) {
+                onSuccess();
+            } else {
+                speedContext.uploadMultipleLargeFile(fileArr, folderUrl, newNumber, feedBack, onSuccess, onFailed, webAbsoluteUrl, appContext);
+            }
+        }, onFailedCall, webAbsoluteUrl);
+    } else {
+        speedContext.uploadFile(fileArr[fileCount].dataName, fileArr[fileCount].dataURI, folderUrl, function (fileDetails) {
+            var totalFiles = fileArr.length;
+            var newNumber = parseInt(fileCount) + 1;
+            var completed = (newNumber / totalFiles) * 100;
+            feedBack(parseInt(completed), fileDetails);
+            if (completed == 100) {
+                onSuccess();
+            } else {
+                speedContext.uploadMultipleLargeFile(fileArr, folderUrl, newNumber, feedBack, onSuccess, onFailed, webAbsoluteUrl, appContext);
+            }
+        }, onFailedCall, appContext);
+    }
+}
+
+/**
+ * The uploadFileChunk function uploads part of a large file to a folder in a Libary or directly to a library itself.
+ * @param {String} id the GUID of the upload session
+ * @param {String} fileUrl the file url on sharepoint
+ * @param {object} chunk settings for the upload method to be called
+ * @param {Bytes} data parts of the data to be uploaded on the current session 
+ * @param {callback} onSuccess this parameter is the call back function when all the files have been uploaded successfully
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {string} webAbsoluteUrl the absolute url of where the folder in which the file will be uploaded to resides.by default the current site url is used
+ */
+Speed.prototype.uploadFileChunk = function (id, fileUrl, chunk, data, onSuccess, onFailed, webAbsoluteUrl) {
+    var siteContextToUse = (typeof webAbsoluteUrl === "undefined" || webAbsoluteUrl == null) ? _spPageContextInfo.webAbsoluteUrl : webAbsoluteUrl
+    var offset = chunk.offset === 0 ? '' : ',fileOffset=' + chunk.offset;
+    //parameterising the components of this endpoint avoids the max url length problem in SP (Querystring parameters are not included in this length)  
+    var endpoint = siteContextToUse + "/_api/web/getfilebyserverrelativeurl('" + fileUrl + "')/" + chunk.method + "(uploadId=guid'" + id + "'" + offset + ")";
+
+    var headers = {
+        "Accept": "application/json; odata=verbose",
+        "X-RequestDigest": $("#__REQUESTDIGEST").val()
+    };
+
+    $.ajax({
+        url: endpoint,
+        async: true,
+        method: "POST",
+        headers: headers,
+        data: data,
+        binaryStringRequestBody: true,
+        processData: false,
+        success: function () {
+            onSuccess();
+        },
+        error: function (responseText) {
+            onFailed(responseText);
+        }
+    });
+}
+
+/**
+ * The uploadFileChunk function uploads part of a large file to a folder in a Libary or directly to a library itself.
+ * @param {Speed.filesDictionary} fileProperties the details of the file in the file dictionary object
+ * @param {SP.File} filedetails the uploaded file properties
+ * @param {String} index the file position in the file dictionary array 
+ * @param {callback} onSuccess this parameter is the call back function when all the files have been uploaded successfully
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {string} webAbsoluteUrl the absolute url of where the folder in which the file will be uploaded to resides.by default the current site url is used
+ */
+Speed.prototype.prepareChunkFile = function (fileProperties, filedetails, index, onSuccess, onFailed, webAbsoluteUrl) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var arrayBuffer = fileProperties.chunks[index].method === 'finishupload' ? fileProperties.dataURI.slice(fileProperties.chunks[index].offset) :
+        fileProperties.dataURI.slice(fileProperties.chunks[index].offset, fileProperties.chunks[index].offset + fileProperties.chunks[index].length);
+
+    var chunkData = arrayBuffer;
+
+    var fileUrl = filedetails.get_serverRelativeUrl();
+    speedContext.uploadFileChunk(fileProperties.GUID, fileUrl, fileProperties.chunks[index], chunkData, function () {
+        index += 1;
+        if (index < fileProperties.chunks.length)
+            speedContext.prepareChunkFile(fileProperties, filedetails, index, onSuccess, onFailed, webAbsoluteUrl);
+        else {
+            onSuccess(filedetails);
+        }
+    }, onFailedCall, webAbsoluteUrl);
+}
+
+
+/**
+ * Grab All Attcahments
+ */
+Speed.prototype.grabAllAttachments = function () {
+    var returnArray = [];
+    var files = this.filesDictionary;
+    for (var x in files) {
+        for (var y = 0; y < files[x].length; y++) {
+            if (typeof files[x][y] === 'object') {
+                returnArray.push(files[x][y]);
+            }
+        }
+    }
+    return returnArray;
+}
+
+/**
+ * The uploadFile function upload a file to a folder in a Libary or directly to a library itself
+ * @param {String} sourceUrl the url of the source library where the files to be moved resides
+ * @param {String} destinationUrl the url of the destination library where the files will be moved to
+ * @param {callback} onSuccess this parameter is the call back function when the upload is successful. The SP.File object is returned as an argument
+ * when the upload is successful.
+ * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default
+ * onQueryFailed is called when all sharepoint async calls fail
+ * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
+ */
+Speed.prototype.moveFilesToFolder = function (sourceUrl, destinationUrl, onSuccess, onFailed, appContext) {
+    var speedContext = this;
+    var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
+    var context = this.initiate();
+    var web = context.get_web();
+
+    window.speedGlobal.push(web.getFolderByServerRelativeUrl(sourceUrl));
+    var total = window.speedGlobal.length;
+    total--;
+    if (typeof appContext !== 'undefined') {
+        context = appContext.initiate();
+    }
+    context.load(window.speedGlobal[total], 'Files');
+    context.executeQueryAsync(function () {
+        var files = window.speedGlobal[total].get_files();
+        var e = files.getEnumerator();
+        while (e.moveNext()) {
+            var file = e.get_current();
+            var destLibUrl = destinationUrl + "/" + file.get_name();
+            file.moveTo(destLibUrl, SP.MoveOperations.overwrite);
+        }
+        context.executeQueryAsync(function () {
+            setTimeout(function () {
+                onSuccess();
+            }, 1000)
+        }, Function.createDelegate(this, onFailedCall));
+    }, Function.createDelegate(this, onFailedCall));
 }
 
 /**
@@ -2915,7 +4626,7 @@ Speed.prototype.uploadMultipleFiles = function (fileArr, folderUrl, fileCount, f
  *      console.log("All files uploaded successfully");
  * });
  */
-Speed.prototype.addAttachmentToItem = function (itemID,listName,fileArr,feedback,onSuccess, onFailed, appContext) {
+Speed.prototype.addAttachmentToItem = function (itemID, listName, fileArr, feedback, onSuccess, onFailed, appContext) {
     var speedContext = this;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var context = this.initiate();
@@ -2924,27 +4635,26 @@ Speed.prototype.addAttachmentToItem = function (itemID,listName,fileArr,feedback
     if (typeof appContext !== 'undefined') {
         context = appContext.initiate();
     }
-    context.load(list,'RootFolder');
+    context.load(list, 'RootFolder');
     var item = list.getItemById(itemID);
     context.load(item);
-    context.executeQueryAsync(function(){
-        if(!item.get_fieldValues()['Attachments']){
+    context.executeQueryAsync(function () {
+        if (!item.get_fieldValues()['Attachments']) {
             var attachmentRootFolderUrl = String.format('{0}/Attachments', list.get_rootFolder().get_serverRelativeUrl());
             var attachmentsRootFolder = context.get_web().getFolderByServerRelativeUrl(attachmentRootFolderUrl);
             //var attachmentsFolder = attachmentsRootFolder.get_folders().add(itemID);
             var attachmentsFolder = attachmentsRootFolder.get_folders().add('_' + itemID);
             attachmentsFolder.moveTo(attachmentRootFolderUrl + '/' + itemID);
-        }
-        else{
+        } else {
             //
-            var attachmentRootFolderUrl = String.format('{0}/Attachments/{1}', list.get_rootFolder().get_serverRelativeUrl(),itemID);
+            var attachmentRootFolderUrl = String.format('{0}/Attachments/{1}', list.get_rootFolder().get_serverRelativeUrl(), itemID);
             var attachmentsFolder = context.get_web().getFolderByServerRelativeUrl(attachmentRootFolderUrl);
         }
         context.load(attachmentsFolder);
-        context.executeQueryAsync(function(){
+        context.executeQueryAsync(function () {
             var folderUrl = attachmentsFolder.get_serverRelativeUrl();
             var fileCount = 0;
-            speedContext.uploadMultipleFiles(fileArr,folderUrl,fileCount,feedback,onSuccess,onFailed,appContext);
+            speedContext.uploadMultipleFiles(fileArr, folderUrl, fileCount, feedback, onSuccess, onFailed, appContext);
         }, Function.createDelegate(this, onFailedCall));
     }, Function.createDelegate(this, onFailedCall));
 };
@@ -2968,13 +4678,237 @@ Speed.prototype.readFile = function (fileurl, onSuccess, onFailed, appContext) {
     ctx.load(oWebsite);
     ctx.executeQueryAsync(function () {
         var fileUrl = fileurl;
-        $.ajax({
-            url: fileUrl,
-            type: "GET"
-        })
-        .done(Function.createDelegate(this, onSuccess))
-        .error(Function.createDelegate(this, onFailedCall));
+        try {
+            $.ajax({
+                url: fileUrl,
+                type: "GET"
+            }).done(onSuccess).fail(onFailedCall);
+        } catch (e) {
+            $.ajax({
+                url: fileUrl,
+                type: "GET"
+            }).done(onSuccess).error(onFailedCall);
+        }
     }, onFailedCall);
+}
+
+/**
+ * The readFile function reads content of a file
+ * @param {String} elementId the id of the element to apply the event handler on
+ * @param {String} properties the settings for the file to be uploaded
+ * @param {callback(data)} onSuccess this parameter is the call back function when the a file is selected
+ * @param {callback(error)} onFailed this parameter is the call back function thats called when the function fails
+ */
+Speed.prototype.applyAttachmentEvent = function (properties, onSuccess, onFailed) {
+    var speedContext = this;
+
+    var attachments = this.getAttachmentControls();
+    for (var z = 0; z < attachments.length; z++) {
+        var elementId = attachments[z].id;
+        var tagName = attachments[z].type;
+
+        if (tagName === "file" && $.inArray(elementId, speedContext.appliedEvents.attachments) < 0) {
+            speedContext.appliedEvents.attachments.push(elementId);
+            document.getElementById(elementId).addEventListener('change', function (evt) {
+                var elementId = this.id;
+                var fileCount = 0;
+                var maxFileSize = (typeof properties.maxSize !== "undefined") ? properties.maxSize : 5100;
+                var acceptedFiles = ["png", "jpeg", "jpg", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv"];
+                var overrideDefaultFiles = (typeof properties.overrideDefaultFiles === "undefined") ? false : properties.overrideDefaultFiles;
+                if (overrideDefaultFiles) {
+                    var elementBindProperty = (document.getElementById(elementId).getAttribute("speed-file-bind") === null) ?
+                        document.getElementById(elementId).getAttribute("speed-file-validate") : document.getElementById(elementId).getAttribute("speed-file-bind");
+
+                    acceptedFiles = properties.fileExtensions;
+                    if (typeof properties.fileExtensions !== "undefined") {
+                        if (typeof properties.fileExtensions[elementBindProperty] !== "undefined" && typeof properties.fileExtensions[elementBindProperty] !== null) {
+                            acceptedFiles = properties.fileExtensions[elementBindProperty];
+                        }
+                    }
+                } else {
+                    var extensions = properties.fileExtensions;
+                    var elementBindProperty = (document.getElementById(elementId).getAttribute("speed-file-bind") === null) ?
+                        document.getElementById(elementId).getAttribute("speed-file-validate") : document.getElementById(elementId).getAttribute("speed-file-bind");
+                    if (typeof properties.fileExtensions !== "undefined") {
+                        if (typeof properties.fileExtensions[elementBindProperty] !== "undefined" && typeof properties.fileExtensions[elementBindProperty] !== null) {
+                            extensions = properties.fileExtensions[elementBindProperty];
+                        }
+                    }
+                    acceptedFiles = (typeof properties.fileExtensions === "undefined") ? acceptedFiles : (acceptedFiles.concat(extensions));
+                }
+
+                //element file type
+                try {
+                    acceptedFiles = (document.getElementById(elementId).getAttribute("speed-file-type") === null) ?
+                        acceptedFiles : document.getElementById(elementId).getAttribute("speed-file-type").split(",");
+                } catch (e) {
+
+                }
+
+                var useDynamicName = (typeof properties.dynamicNaming === "undefined") ? true : properties.dynamicNaming;
+
+                var appendFiles = (typeof properties.appendFiles === "undefined") ? false : properties.appendFiles;
+
+                var useCancelToClear = (typeof properties.cancelClear === "undefined") ? true : properties.cancelClear;
+
+                var useFileName = (typeof properties.fileNameasName === "undefined") ? false : properties.fileNameasName;
+
+                var eachFileProperties = (typeof properties.fileProperties !== "undefined") ? properties.fileProperties : {};
+
+                properties.o365 = (typeof properties.o365 !== "undefined") ? properties.o365 : false;
+                //when event is clicked 
+                if (window.File && window.FileReader && window.FileList && window.Blob) {
+                    // Great success! All the File APIs are supported.
+
+                    var files = evt.target.files; // FileList object
+                    var filesId = evt.target.id;
+                    var totalFilesPerClick = files.length;
+
+                    //remove speederror class
+                    $("#" + filesId).removeClass("speedhtmlerr");
+                    // Loop through the FileList 
+                    for (var i = 0, f; f = files[i]; i++) {
+                        var reader = new FileReader();
+                        reader.onload = (function (theFile) {
+                            return function (e) {
+                                // Render thumbnail.
+                                var fileSize = theFile.size / 1000;
+                                var fileType = theFile.type;
+                                var fileNameSplit = theFile.name.split(".");
+                                var fileExt = fileNameSplit.pop();
+                                if ($.inArray(fileExt.toLowerCase(), acceptedFiles) >= 0) {
+                                    if (fileSize < maxFileSize) {
+                                        fileCount++;
+
+                                        var elementBindProperty = (document.getElementById(filesId).getAttribute("speed-file-bind") === null) ?
+                                            document.getElementById(filesId).getAttribute("speed-file-validate") : document.getElementById(filesId).getAttribute("speed-file-bind");
+
+                                        var defaultName = (typeof properties.dataNameDefault === "undefined") ? elementBindProperty : properties.dataNameDefault;
+                                        defaultName = (typeof eachFileProperties[elementBindProperty] === "undefined") ? defaultName : eachFileProperties[elementBindProperty].name;
+
+                                        if (appendFiles && typeof speedContext.filesDictionary[elementBindProperty] !== "undefined") {
+                                            fileCount = speedContext.filesDictionary[elementBindProperty].length + 1;
+                                        }
+
+                                        var fileObject = {};
+                                        fileObject.dataURI = e.target.result;
+                                        fileObject.dataName = (!useDynamicName) ? (defaultName + "." + fileExt) :
+                                            (defaultName + "-" + fileCount + "-" + speedContext.stringnifyDate({
+                                                includeTime: true,
+                                                timeSpace: false,
+                                                format: "dd-mm-yy"
+                                            }) + "." + fileExt);
+                                        fileObject.filename = theFile.name;
+                                        var fileNameIsValid = true;
+                                        if (useFileName) {
+                                            var validationResult = speedContext.validationProperties.file.validate(fileObject.filename, "File", filesId);
+                                            if (!validationResult) {
+                                                fileNameIsValid = false;
+                                            } else {
+                                                fileObject.dataName = fileObject.filename;
+                                            }
+                                        }
+
+                                        fileObject.extension = fileExt.toLowerCase();
+                                        fileObject.id = filesId;
+                                        fileObject.property = elementBindProperty;
+                                        fileObject.dataType = "string";
+                                        if (typeof e.target.result !== "string") {
+                                            var offset = 0;
+                                            var total = theFile.size;
+                                            var length = 1000000 > total ? total : 1000000;
+                                            var chunks = [];
+
+                                            while (offset < total) {
+                                                if (offset + length > total)
+                                                    length = total - offset;
+                                                chunks.push({
+                                                    offset: offset,
+                                                    length: length,
+                                                    method: speedContext.getChunkUploadMethod(offset, length, total)
+                                                });
+                                                offset += length;
+                                            }
+                                            if (chunks.length > 0) {
+                                                fileObject.GUID = speedContext.uniqueIdGenerator();
+                                                fileObject.dataType = "ArrayBuffer";
+                                                fileObject.chunks = chunks;
+                                            }
+                                        }
+
+                                        if (fileCount === 1 && !appendFiles) {
+                                            speedContext.filesDictionary[elementBindProperty] = [];
+                                        } else if (typeof speedContext.filesDictionary[elementBindProperty] === "undefined") {
+                                            speedContext.filesDictionary[elementBindProperty] = [];
+                                        }
+
+                                        if (totalFilesPerClick === i && fileNameIsValid) {
+                                            speedContext.filesDictionary[elementBindProperty].push(fileObject);
+                                            onSuccess(elementBindProperty, speedContext.filesDictionary[elementBindProperty], filesId);
+                                        }
+
+                                        if (!fileNameIsValid) {
+                                            var errorProp = {
+                                                msg: "your item has an invalid file name",
+                                                type: "invalidfile",
+                                                elementid: filesId
+                                            };
+                                            onFailed(errorProp);
+                                            speedContext.clearFileInput(filesId);
+                                        }
+                                    } else {
+                                        var errorProp = {
+                                            msg: "your item is greater than " + maxFileSize + " and will not be included",
+                                            type: "size",
+                                            elementid: filesId
+                                        };
+                                        onFailed(errorProp);
+                                        speedContext.clearFileInput(filesId);
+                                    }
+                                } else {
+                                    var errorProp = {
+                                        msg: "One of your items file and will not be included because the format isnt accepted",
+                                        type: "format",
+                                        elementid: filesId
+                                    };
+                                    onFailed(errorProp);
+                                    speedContext.clearFileInput(filesId);
+                                }
+                            };
+                        })(f);
+                        //if file size is greater than 1.8MB and on o365 Platform
+                        if (files[i].size > 1487436.8 && properties.o365) {
+                            reader.readAsArrayBuffer(f);
+                        } else {
+                            reader.readAsDataURL(f);
+                        }
+                    }
+
+                    if (files.length === 0 && useCancelToClear) {
+                        var elementBindProperty = (document.getElementById(filesId).getAttribute("speed-file-bind") === null) ?
+                            document.getElementById(filesId).getAttribute("speed-file-validate") : document.getElementById(filesId).getAttribute("speed-file-bind");
+                        speedContext.filesDictionary[elementBindProperty] = [];
+                        onSuccess(elementBindProperty, speedContext.filesDictionary[elementBindProperty]);
+                    }
+                } else {
+                    onFailed('The File APIs are not fully supported in this browser.');
+                }
+            }, false);
+        }
+    }
+
+}
+
+
+Speed.prototype.getChunkUploadMethod = function (offset, length, total) {
+    if (offset + length + 1 > total) {
+        return 'finishupload';
+    } else if (offset === 0) {
+        return 'startupload';
+    } else if (offset < total) {
+        return 'continueupload';
+    }
+    return null;
 }
 
 //------------------------check if file exist in documnet library---------------------
@@ -2987,25 +4921,22 @@ Speed.prototype.readFile = function (fileurl, onSuccess, onFailed, appContext) {
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {SPContext} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed,appContext) {
+Speed.prototype.getFileFolderExists = function (fileFolderUrl, fileorfolder, onSuccess, onFailed, appContext) {
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
     var ctx = this.initiate();
-    var file = ctx.get_web().getFileByServerRelativeUrl(fileUrl);
+    if (fileorfolder.toLowerCase() === "file") {
+        var file = ctx.get_web().getFileByServerRelativeUrl(fileFolderUrl);
+    } else {
+        var file = ctx.get_web().getFolderByServerRelativeUrl(fileFolderUrl);
+    }
+
     if (typeof appContext !== 'undefined') {
         ctx = appContext.initiate();
     }
     ctx.load(file);
     ctx.executeQueryAsync(function () {
         onSuccess(true);
-    },
-    function (sender, args) {
-        if (args.get_errorTypeName() === "System.IO.FileNotFoundException") {
-            onSuccess(false);
-        }
-        else {
-            onFailedCall(sender, args);
-        }
-    });
+    }, onFailedCall);
 }
 
 /**
@@ -3020,10 +4951,14 @@ Speed.prototype.getFileExists = function (fileUrl, onSuccess, onFailed,appContex
  * onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = {}] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.logWriter = function (fileName, logContent, library, libraryUrl, logLimit, callback, onFailed, appContext) {
+Speed.prototype.logWriter = function (logContent, library, logLimit, callback, onFailed, appContext) {
     var speedContext = this;
     var onFailedCall = (typeof onFailed === 'undefined' || onFailed == null) ? this.errorHandler : onFailed;
-    var query = [{ orderby: "ID", rowlimit: 1, ascending: "FALSE" }];
+    var query = [{
+        orderby: "ID",
+        rowlimit: 1,
+        ascending: "FALSE"
+    }];
     speedContext.getItem(library, speedContext.camlBuilder(query), function (speedlog) {
         var logsCount = 0;
         var listEnumerator = speedlog.getEnumerator();
@@ -3034,11 +4969,17 @@ Speed.prototype.logWriter = function (fileName, logContent, library, libraryUrl,
             itemDetails.url = listEnumerator.get_current().get_item('FileRef');
             itemDetails.size = listEnumerator.get_current().get_item('File_x0020_Size');
         }
+        var libraryUrl = speedlog.get_context().get_url();
+        libraryUrl += "/" + library;
         if (logsCount == 0 || itemDetails.size > logLimit) {
             //this logs of file if no log text file is present or if the log is greater than limit passed
+            var fileName = "SPeedPointErrorLogs-" + speedContext.stringnifyDate({
+                includeTime: true,
+                timeSpace: false,
+                format: "dd-mm-yy"
+            }) + ".txt";
             speedContext.uploadFile(fileName, logContent, libraryUrl, callback, onFailed, appContext);
-        }
-        else {
+        } else {
             speedContext.readFile(itemDetails.url, function (data) {
                 data += logContent;
                 speedContext.uploadFile(itemDetails.name, data, libraryUrl, callback, onFailed, appContext);
@@ -3061,15 +5002,15 @@ Speed.prototype.logWriter = function (fileName, logContent, library, libraryUrl,
 Speed.prototype.onQueryFailed = function (sender, args) {
     try {
         console.log('Request failed. ' + args.get_message() + '\n' + args.get_stackTrace());
-    }
-    catch (e) {
+    } catch (e) {
         console.log('Request failed. ' + sender.msg);
     }
 }
 
 //work in progress
-Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
-    if(window["localStorage"]){
+//onpremise or inpage use only ..App Model Doesnt Cache
+Speed.prototype.scriptCacheDebugger = function (scriptToCheck, callBack) {
+    if (window["localStorage"]) {
         var scriptTag = null;
         var scripts = document.getElementsByTagName("script");
         for (var i = 0; i < scripts.length; i++) {
@@ -3083,16 +5024,16 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
         var returnObject = {};
         var lastFileSize = localStorage.getItem("speed" + scriptToCheck + "size");
         var lastFileVersion = localStorage.getItem("speed" + scriptToCheck + "version");
-        if(scriptTag !== null){
+        if (scriptTag !== null) {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', scriptTag.src, true);
             xhr.responseType = 'text';
-            xhr.onload = function(e) {
+            xhr.onload = function (e) {
                 if (this.status == 200) {
                     // Note: .response instead of .responseText
                     var fileInBytes = this.getResponseHeader('Content-Length');
-                    if(lastFileSize !== null){
-                        if(fileInBytes.toString() !== lastFileSize){
+                    if (lastFileSize !== null) {
+                        if (fileInBytes.toString() !== lastFileSize) {
                             returnObject.fileChanged = true;
                             returnObject.previousSize = lastFileSize;
                             returnObject.currentSize = fileInBytes;
@@ -3101,43 +5042,65 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
                             versionNo = parseInt(versionNo) + 1;
                             versionNo = versionNo.toString();
                             var newVersionNo = "";
-                            for(var x = 0; x <= (versionNo.length - 1); x++){
-                                if((versionNo.length - 1) == x)
+                            for (var x = 0; x <= (versionNo.length - 1); x++) {
+                                if ((versionNo.length - 1) == x)
                                     newVersionNo += versionNo[x];
                                 else
                                     newVersionNo += versionNo[x] + ".";
                             }
                             returnObject.version = newVersionNo;
 
-                            localStorage.setItem("speed" + scriptToCheck + "size",fileInBytes);
+                            localStorage.setItem("speed" + scriptToCheck + "size", fileInBytes);
                             localStorage.setItem("speed" + scriptToCheck + "version", newVersionNo);
-                        }
-                        else{
+                        } else {
                             returnObject.fileChanged = false;
                             returnObject.previousSize = fileInBytes;
                             returnObject.currentSize = fileInBytes;
                             returnObject.version = lastFileVersion;
                         }
-                    }
-                    else{
-                        localStorage.setItem("speed" + scriptToCheck + "size",fileInBytes);
+                    } else {
+                        localStorage.setItem("speed" + scriptToCheck + "size", fileInBytes);
                         localStorage.setItem("speed" + scriptToCheck + "version", "1.0.0.0");
                         returnObject.fileChanged = false;
                         returnObject.previousSize = fileInBytes;
                         returnObject.currentSize = fileInBytes;
                         returnObject.version = "1.0.0.0";
                     }
-                    if(typeof callBack !== "undefined"){
+                    if (typeof callBack !== "undefined") {
                         callBack(returnObject);
                     }
                 }
             };
             xhr.send();
         }
-    }
-    else{
+    } else {
         console.warn("Script debugger function only works with local storage.....");
     }
+}
+
+Speed.prototype.debugHandler = function (code, type, id, extension) {
+    var errorDefinitions = {
+        "1111": function () {
+            var errorMsg = "validation failed, there is no custom extended function '" + extension + "' created for this element with " +
+                " ID '" + id + "' of type: '" + type + "'  to handle this validation..";
+            return errorMsg;
+        },
+        "1112": function () {
+            var errorMsg = "validation failed, there is no id for this element";
+            return errorMsg;
+        },
+        "1113": function () {
+            var errorMsg = "validation failed, the extension '" + extension + "' for this element " +
+                " ID '" + id + "' of type: '" + type + "'  is invalid as multivalue extension only works for checkbox(s)";
+            return errorMsg;
+        },
+        "1114": function () {
+            var errorMsg = "validation failed, invalid file name for the attached document";
+            return errorMsg;
+        }
+    }
+    var msg = errorDefinitions[code]();
+    console.log(msg);
 }
 
 /* ============================== Table Section ============================*/
@@ -3153,13 +5116,18 @@ Speed.prototype.scriptCacheDebugger = function (scriptToCheck,callBack) {
  * @param {callback(sender,args)} [onFailed = this.onQueryFailed()] this parameter is the call back function thats called when the function fails, by default onQueryFailed is called when all sharepoint async calls fail
  * @param {object} [appContext = Object] instance of the speedpoint app context created, used for o365 Cross Domain Request
  */
-Speed.prototype.getListToTable = function (listName, caml, controls, conditions,onSuccess, onFailed, appContext) {
+Speed.prototype.getListToTable = function (listName, caml, controls, conditions, onSuccess, onFailed, appContext) {
     var SpeedContext = this;
+    var resetDataTable = (typeof controls.resetTable === "undefined") ? true : controls.resetTable;
+    if (resetDataTable) {
+        SpeedContext.DataForTable.tabledata = [];
+    }
     SpeedContext.DataForTable.lastPageItem = SpeedContext.DataForTable.currentPage * SpeedContext.DataForTable.pagesize;
-    SpeedContext.getListToItems(listName, caml, controls,true, conditions, function (requestItems) {
+    SpeedContext.getListToItems(listName, caml, controls, true, conditions, function (requestItems) {
         //gets only table controls
-        var tableControls = SpeedContext.getControls(true);
-        SpeedContext.DataForTable.tabledata = requestItems;
+        var tableId = (typeof controls.tableid !== "") ? controls.tableid : "";
+        var tableControls = SpeedContext.getControls(true, tableId);
+        SpeedContext.DataForTable.tabledata = SpeedContext.DataForTable.tabledata.concat(requestItems);
         var Arr = SpeedContext.DataForTable.tabledata;
         if (Arr.length != 0) {
             $('#' + SpeedContext.DataForTable.tablecontentId).empty();
@@ -3173,157 +5141,226 @@ Speed.prototype.getListToTable = function (listName, caml, controls, conditions,
             for (x = 0; x < SpeedContext.DataForTable.lastPageItem; x++) {
                 if (SpeedContext.DataForTable.modifyTR) {
                     str += SpeedContext.DataForTable.trExpression(x);
-                }
-                else {
+                } else {
                     str += "<tr>";
                 }
-                if(SpeedContext.DataForTable.includeSN){
+                if (SpeedContext.DataForTable.includeSN) {
                     str += "<td>" + (x + 1) + "</td>";
                 }
-                for (var propName in Arr[x]) {
-                    if($.inArray(propName, tableControls) >= 0){
-                        if(SpeedContext.DataForTable.propertiesHandler.hasOwnProperty(propName)){
-                            str += "<td>" + SpeedContext.DataForTable.propertiesHandler[propName](Arr[x]) + "</td>";
-                        }
-                        else
+
+                for (var y = 0; y < tableControls.length; y++) {
+                    var propName = tableControls[y];
+                    var groupName = $("[speed-table-data='" + propName + "']").attr("speed-table-group");
+                    groupName = (typeof groupName !== "undefined") ? groupName : "SP-NOTApplicable";
+
+                    var useTD = $("[speed-table-data='" + propName + "']").attr("speed-table-includetd");
+                    useTD = (typeof useTD !== "undefined") ? (useTD === "true") : true;
+
+                    if (Arr[x][propName] !== "undefined") {
+                        if (SpeedContext.DataForTable.propertiesHandler.hasOwnProperty(propName)) {
+                            if (useTD) {
+                                str += "<td>" + SpeedContext.DataForTable.propertiesHandler[propName](Arr[x], x) + "</td>";
+                            } else {
+                                str += SpeedContext.DataForTable.propertiesHandler[propName](Arr[x], x);
+                            }
+                        } else if (SpeedContext.DataForTable.propertiesHandler.hasOwnProperty(groupName)) {
+                            if (useTD) {
+                                str += "<td>" + SpeedContext.DataForTable.propertiesHandler[groupName](Arr[x], x, propName) + "</td>";
+                            } else {
+                                str += SpeedContext.DataForTable.propertiesHandler[propName](Arr[x], x, propName);
+                            }
+
+                        } else
                             str += "<td>" + Arr[x][propName] + "</td>";
+                    } else {
+                        str += "<td></td>";
                     }
                 }
                 str += "</tr>";
             }
             $('#' + SpeedContext.DataForTable.tablecontentId).append(str);
-            SpeedContext.DataForTable.paginateLinks(1, SpeedContext.DataForTable.paginateSize,SpeedContext.DataForTable);
-            $("#pageBack").hide();
-            $("#pageBackUp").hide();
+            SpeedContext.DataForTable.paginateLinks(1, SpeedContext.DataForTable.paginateSize, SpeedContext.DataForTable);
+            $("#" + SpeedContext.DataForTable.paginationbId + " li a." + SpeedContext.DataForTable.tablecontentId + "-moveback").hide();
+            $("#" + SpeedContext.DataForTable.paginationuId + " li a." + SpeedContext.DataForTable.tablecontentId + "-moveback").hide();
             if (SpeedContext.DataForTable.noOfPages <= SpeedContext.DataForTable.paginateSize) {
-                $("#pageFront").hide();
-                $("#pageFrontUp").hide();
+                $("#" + SpeedContext.DataForTable.paginationbId + " li a." + SpeedContext.DataForTable.tablecontentId + "-movefront").hide();
+                $("#" + SpeedContext.DataForTable.paginationuId + " li a." + SpeedContext.DataForTable.tablecontentId + "-movefront").hide();
             }
-        }
-        else {
+        } else {
             $('#' + SpeedContext.DataForTable.tablecontentId).empty();
         }
         onSuccess(SpeedContext.DataForTable.tabledata);
     }, onFailed, appContext);
 }
 
-Speed.prototype.DataForTable = {
-    tabledata: [],
-    noOfPages: 0,
-    currentPage: 1,
-    pagesize: 30,
-    paginateSize: 5,
-    currentPos: 1,
-    lastPageItem: 0,
-    activeClass: "",
-    tablecontentId: "",
-    includeSN: true,
-    modifyTR: false,
-    context: null,
-    //this is responsible for paginating the table
-    paginateLinks: function (srt, end, settings) {
-        $("#noOfPages").empty();
-        $("#noOfPagesUp").empty();
-        if (end > settings.noOfPages) {
-            end = settings.noOfPages;
+/**
+ * Exports a Array to a Table. Creates the TBody content of the array passed
+ * @param {String} tableData this parameter specifices the data to create the table
+ */
+Speed.prototype.manualTable = function (tableData, condition) {
+    this.DataForTable.lastPageItem = this.DataForTable.currentPage * this.DataForTable.pagesize;
+    var tableControls = this.getControls(true, "");
+    this.DataForTable.tabledata = tableData;
+    if (this.DataForTable.tabledata.length != 0) {
+        $('#' + this.DataForTable.tablecontentId).empty();
+        this.DataForTable.activeClass = 1;
+        var total = this.DataForTable.tabledata.length;
+        this.DataForTable.noOfPages = Math.ceil(total / this.DataForTable.pagesize);
+        if (total < this.DataForTable.lastPageItem) {
+            this.DataForTable.lastPageItem = total;
         }
-        $("#noOfPages").append("<li> <a id=\"pageBack\" class='" + settings.tablecontentId + "-move'><<</a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageBackUp\" class='" + settings.tablecontentId + "-move'><<</a> </li>");
-        for (srt; srt <= end; srt++) {
+        var str = "";
+        for (x = 0; x < this.DataForTable.lastPageItem; x++) {
 
-            if (srt == settings.activeClass) {
-                $("#noOfPages").append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + " active\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
+            if (typeof condition === "function") {
+                this.DataForTable.tabledata[x] = condition(this.DataForTable.tabledata[x], x);
             }
-            else {
-                $("#noOfPages").append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
-                $("#noOfPagesUp").append("<li class=\"lin" + srt + "\"> <a class='" + settings.tablecontentId + "'>" + srt + "</a> </li>");
-            }
-        }
-        $("#noOfPages").append("<li> <a id=\"pageFront\" class='" + settings.tablecontentId + "-move'>>></a> </li>");
-        $("#noOfPagesUp").append("<li> <a id=\"pageFrontUp\" class='" + settings.tablecontentId + "-move'>>></a> </li>");
-        $("." + settings.tablecontentId).click(function () {
-            settings.nextItems($(this).text(), settings);
-        });
 
-        $("." + settings.tablecontentId + "-move").click(function () {
-            settings.moveLinks(this.id, settings);
-        });
-    },
-    //this is responsible for showing the next items the table
-    nextItems: function (id, settings) {
-        if (settings.tabledata.length != 0) {
-            $(".lin" + settings.activeClass).removeClass('active');
-            $(".lin" + id).addClass('active');
-            settings.activeClass = id;
-            $('#' + settings.tablecontentId).empty();
-            var old = id - 1;
-            var total = settings.tabledata.length;
-            var previousItem = old * settings.pagesize;
-            var nextPageItem = id * settings.pagesize;
-            if (nextPageItem > total) {
-                nextPageItem = total;
+            if (this.DataForTable.modifyTR) {
+                str += this.DataForTable.trExpression(x);
+            } else {
+                str += "<tr>";
             }
-            var str = "";
-            var tableControls = settings.context.getControls(true);
-            for (previousItem; previousItem < nextPageItem; previousItem++) {
-                if (settings.modifyTR) {
-                    str += settings.context.DataForTable.trExpression(previousItem);
-                }
-                else {
-                    str += "<tr>";
-                }
-                if (settings.includeSN) {
-                    str += "<td>" + (previousItem + 1) + "</td>";
-                }
-                for (var propName in settings.tabledata[previousItem]) {
-                    if ($.inArray(propName, tableControls) >= 0) {
-                        if (settings.propertiesHandler.hasOwnProperty(propName)) {
-                            str += "<td>" + settings.propertiesHandler[propName](settings.tabledata[previousItem]) + "</td>";
+            if (this.DataForTable.includeSN) {
+                str += "<td>" + (x + 1) + "</td>";
+            }
+
+            for (var y = 0; y < tableControls.length; y++) {
+                var propName = tableControls[y];
+                var groupName = $("[speed-table-data='" + propName + "']").attr("speed-table-group");
+                groupName = (typeof groupName !== "undefined") ? groupName : "SP-NOTApplicable";
+
+                var useTD = $("[speed-table-data='" + propName + "']").attr("speed-table-includetd");
+                useTD = (typeof useTD !== "undefined") ? (useTD === "true") : true;
+
+                if (this.DataForTable.tabledata[x][propName] !== "undefined") {
+                    if (this.DataForTable.propertiesHandler.hasOwnProperty(propName)) {
+                        if (useTD) {
+                            str += "<td>" + this.DataForTable.propertiesHandler[propName](this.DataForTable.tabledata[x], x) + "</td>";
+                        } else {
+                            str += this.DataForTable.propertiesHandler[propName](this.DataForTable.tabledata[x], x);
                         }
-                        else
-                            str += "<td>" + settings.tabledata[previousItem][propName] + "</td>";
-                    }
+                    } else if (this.DataForTable.propertiesHandler.hasOwnProperty(groupName)) {
+                        if (useTD) {
+                            str += "<td>" + this.DataForTable.propertiesHandler[propName](this.DataForTable.tabledata[x], x, propName) + "</td>";
+                        } else {
+                            str += this.DataForTable.propertiesHandler[propName](this.DataForTable.tabledata[x], x, propName);
+                        }
+                    } else
+                        str += "<td>" + this.DataForTable.tabledata[x][propName] + "</td>";
+                } else {
+                    str += "<td></td>";
                 }
-                str += "</tr>";
             }
-            $('#' + settings.tablecontentId).append(str);
+            str += "</tr>";
         }
-    },
-    //this is responsible for moving to the new set of links
-    moveLinks: function (id, settings) {
-        id = id.slice(0, 9);
-        if (id == "pageFront") {
-            settings.currentPos = settings.currentPos + settings.paginateSize;
-            var startPos = settings.currentPos;
-            var endPos = startPos + settings.paginateSize - 1;
-            if (endPos >= settings.noOfPages) {
-                endPos = settings.noOfPages;
-            }
-            settings.paginateLinks(startPos, endPos, settings);
-            $("#pageBack").show();
-            $("#pageBackUp").show();
-            if (endPos >= settings.noOfPages) {
-                $("#pageFront").hide();
-                $("#pageFrontUp").hide();
-            }
+        $('#' + this.DataForTable.tablecontentId).append(str);
+        this.DataForTable.paginateLinks(1, this.DataForTable.paginateSize, this.DataForTable);
+        $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-moveback").hide();
+        $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-moveback").hide();
+        if (this.DataForTable.noOfPages <= this.DataForTable.paginateSize) {
+            $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-movefront").hide();
+            $("#" + this.DataForTable.paginationuId + " li a." + this.DataForTable.tablecontentId + "-movefront").hide();
         }
-        else {
-            settings.currentPos = settings.currentPos - settings.paginateSize;
-            var startPos = settings.currentPos;
-            var endPos = startPos + settings.paginateSize - 1;
-            if (startPos <= 1) {
-                startPos = 1;
-                currentPos = 1;
-            }
-            settings.paginateLinks(startPos, endPos, settings);
-            $("#pageFront").show();
-            $("#pageFrontUp").show();
-            if (startPos <= 1) {
-                $("#pageBack").hide();
-                $("#pageBackUp").hide();
-            }
-        }
-    },
-    propertiesHandler: {}
+    } else {
+        $('#' + this.DataForTable.tablecontentId).empty();
+    }
 }
+
+/**
+ * Exports a Array to a Custom Element Pagination.
+ * @param {String} tableData this parameter specifices the data to create the table
+ */
+Speed.prototype.customElementPagination = function (tableData, blockElement) {
+    this.DataForTable.lastPageItem = this.DataForTable.currentPage * this.DataForTable.pagesize;
+    this.DataForTable.tabledata = tableData;
+    this.DataForTable.customPaginate = true;
+    this.DataForTable.customBlock = blockElement;
+    var Arr = this.DataForTable.tabledata;
+    if (Arr.length != 0) {
+        $('#' + this.DataForTable.tablecontentId).empty();
+        this.DataForTable.activeClass = 1;
+        var total = Arr.length;
+        this.DataForTable.noOfPages = Math.ceil(Arr.length / this.DataForTable.pagesize);
+        if (total < this.DataForTable.lastPageItem) {
+            this.DataForTable.lastPageItem = total;
+        }
+        var str = "";
+        for (x = 0; x < this.DataForTable.lastPageItem; x++) {
+            var innerElement = blockElement;
+            for (var propName in Arr[x]) {
+                try {
+                    var stringToFind = "{{" + propName + "}}";
+                    var regex = new RegExp(stringToFind, "g");
+                    innerElement = innerElement.replace(regex, Arr[x][propName]);
+                } catch (e) {}
+            }
+            str += innerElement;
+        }
+        $('#' + this.DataForTable.tablecontentId).append(str);
+        this.DataForTable.paginateLinks(1, this.DataForTable.paginateSize, this.DataForTable);
+        $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-moveback").hide();
+        $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-moveback").hide();
+        if (this.DataForTable.noOfPages <= this.DataForTable.paginateSize) {
+            $("#" + this.DataForTable.paginationbId + " li a." + this.DataForTable.tablecontentId + "-movefront").hide();
+            $("#" + this.DataForTable.paginationuId + " li a." + this.DataForTable.tablecontentId + "-movefront").hide();
+        }
+    } else {
+        $('#' + this.DataForTable.tablecontentId).empty();
+    }
+}
+
+/**
+ * IE SHIMS (10 && 11)
+ * Fix for file upload for large chunk files on Internet explorer 10 and 11
+ */
+if (!ArrayBuffer.prototype.slice) {
+    //Returns a new ArrayBuffer whose contents are a copy of this ArrayBuffer's
+    //bytes from `begin`, inclusive, up to `end`, exclusive
+    ArrayBuffer.prototype.slice = function (begin, end) {
+        //If `begin` is unspecified, Chrome assumes 0, so we do the same
+        if (begin === void 0) {
+            begin = 0;
+        }
+
+        //If `end` is unspecified, the new ArrayBuffer contains all
+        //bytes from `begin` to the end of this ArrayBuffer.
+        if (end === void 0) {
+            end = this.byteLength;
+        }
+
+        //Chrome converts the values to integers via flooring
+        begin = Math.floor(begin);
+        end = Math.floor(end);
+
+        //If either `begin` or `end` is negative, it refers to an
+        //index from the end of the array, as opposed to from the beginning.
+        if (begin < 0) {
+            begin += this.byteLength;
+        }
+        if (end < 0) {
+            end += this.byteLength;
+        }
+
+        //The range specified by the `begin` and `end` values is clamped to the 
+        //valid index range for the current array.
+        begin = Math.min(Math.max(0, begin), this.byteLength);
+        end = Math.min(Math.max(0, end), this.byteLength);
+
+        //If the computed length of the new ArrayBuffer would be negative, it 
+        //is clamped to zero.
+        if (end - begin <= 0) {
+            return new ArrayBuffer(0);
+        }
+
+        var result = new ArrayBuffer(end - begin);
+        var resultBytes = new Uint8Array(result);
+        var sourceBytes = new Uint8Array(this, begin, end - begin);
+
+        resultBytes.set(sourceBytes);
+
+        return result;
+    };
+}
+
+var $spcontext = new Speed();
